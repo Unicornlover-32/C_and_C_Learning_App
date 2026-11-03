@@ -51,8 +51,6 @@
 			"streambuf": "cpp",
 			"cinttypes": "cpp",
 			"typeinfo": "cpp"
-		},
-		"git.autoRepositoryDetection": false,
-		"git.enabled": false
+		}
 	}
 }
