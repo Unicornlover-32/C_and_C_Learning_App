@@ -1,0 +1,7 @@
+*.exe
+*.dsym
+*.json
+main
+smart-city
+cfordummies
+cfd_practice*
