@@ -1,16 +1,27 @@
 # C and C++ for Dummies - build with:  make
-# If raylib isn't installed system-wide:  make RAYLIB_PATH=/path/to/raylib
-#   (expects RAYLIB_PATH/include/raylib.h and RAYLIB_PATH/lib/libraylib.a)
+# Debug build (for the VS Code debugger):  make DEBUG=1
+# If raylib is somewhere else:  make RAYLIB_PATH=/path/to/raylib
+#   (looks for raylib.h / libraylib.a in RAYLIB_PATH/src, or RAYLIB_PATH/include + RAYLIB_PATH/lib)
 
 CC      = gcc
-TARGET  = cfordummies
-SRC     = src/main.c src/ui.c src/editor.c src/tutorials.c src/runner.c
-CFLAGS  = -std=c99 -Wall -Wextra -O2
+TARGET  = main
+SRC     = $(wildcard src/*.c)
+CFLAGS  = -std=c99 -Wall -Wextra
 LDFLAGS =
 
+ifeq ($(DEBUG),1)
+    CFLAGS += -g -O0
+else
+    CFLAGS += -O2
+endif
+
+ifeq ($(OS),Windows_NT)
+    RAYLIB_PATH ?= C:/raylib/raylib
+endif
+
 ifneq ($(RAYLIB_PATH),)
-    CFLAGS  += -I$(RAYLIB_PATH)/include
-    LDFLAGS += -L$(RAYLIB_PATH)/lib
+    CFLAGS  += -I$(RAYLIB_PATH)/src -I$(RAYLIB_PATH)/include
+    LDFLAGS += -L$(RAYLIB_PATH)/src -L$(RAYLIB_PATH)/lib
 endif
 
 ifeq ($(OS),Windows_NT)
@@ -25,7 +36,7 @@ else
     endif
 endif
 
-$(TARGET): $(SRC) src/*.h
+$(TARGET): $(SRC) $(wildcard src/*.h)
 	$(CC) $(CFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS) $(LDLIBS)
 
 run: $(TARGET)

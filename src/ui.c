@@ -1,4 +1,5 @@
 #include "ui.h"
+#include "highlight.h"
 #include <string.h>
 
 Font gUiFont;
@@ -92,7 +93,19 @@ void UiTextCentered(const char *text, float centerX, float y, float size, Color 
     UiText(text, centerX - UiTextWidth(text, size) / 2.0f, y, size, color);
 }
 
+static float Wrap(const char *text, float x, float y, float maxWidth, float size, Color color, bool draw);
+
 float UiWrapped(const char *text, float x, float y, float maxWidth, float size, Color color)
+{
+    return Wrap(text, x, y, maxWidth, size, color, true);
+}
+
+float UiWrappedHeight(const char *text, float maxWidth, float size)
+{
+    return Wrap(text, 0, 0, maxWidth, size, BLANK, false);
+}
+
+static float Wrap(const char *text, float x, float y, float maxWidth, float size, Color color, bool draw)
 {
     float lineH = size * 1.35f;
     float cy = y;
@@ -104,7 +117,7 @@ float UiWrapped(const char *text, float x, float y, float maxWidth, float size, 
     for (;;) {
         if (*p == '\0' || *p == '\n') {
             line[lineLen] = '\0';
-            UiText(line, x, cy, size, color);
+            if (draw) UiText(line, x, cy, size, color);
             cy += lineH;
             lineLen = 0;
             if (*p == '\0') break;
@@ -129,7 +142,7 @@ float UiWrapped(const char *text, float x, float y, float maxWidth, float size, 
 
         if (lineLen > 0 && UiTextWidth(cand, size) > maxWidth) {
             line[lineLen] = '\0';
-            UiText(line, x, cy, size, color);
+            if (draw) UiText(line, x, cy, size, color);
             cy += lineH;
             memcpy(line, p, wl);
             lineLen = wl;
@@ -183,7 +196,9 @@ float UiCodeBlock(const char *code, float x, float y, float width, float size)
 
     DrawRectangleRounded((Rectangle){ x, y, width, h }, 0.04f, 8, COL_CODE_BG);
     DrawRectangle((int)x, (int)(y + 8), 4, (int)(h - 16), COL_ACCENT);
-    UiCode(code, x + pad + 6, y + pad, size, COL_CODE_TEXT, width - pad * 2 - 6);
+    BeginScissorMode((int)x, (int)y, (int)width, (int)h);
+    HlCode(gCodeFont, code, x + pad + 6, y + pad, size, UiCodeSpacing(size), lineH);
+    EndScissorMode();
     return h;
 }
 

@@ -41,11 +41,12 @@ float UiTextWidth(const char *text, float size);
 
 // Word-wrapped paragraph text. Returns the height used.
 float UiWrapped(const char *text, float x, float y, float maxWidth, float size, Color color);
+float UiWrappedHeight(const char *text, float maxWidth, float size);   // measures without drawing
 
 // Multi-line monospace text. maxWidth <= 0 means no wrapping. Returns the height used.
 float UiCode(const char *text, float x, float y, float size, Color color, float maxWidth);
 
-// A code snippet drawn in a dark rounded box. Returns the height used.
+// A code snippet drawn in a dark rounded box, with syntax colours. Returns the height used.
 float UiCodeBlock(const char *code, float x, float y, float width, float size);
 
 // Clickable area / button. Only one click is accepted per frame.
