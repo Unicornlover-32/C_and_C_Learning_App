@@ -3,8 +3,12 @@
 
 #include "raylib.h"
 
-#define SCREEN_W 1280
-#define SCREEN_H 720
+// The app runs full screen (F11 toggles a window), so layouts follow the real size.
+// The designs are laid out for 1280 x 720 and stretch to fit anything bigger.
+#define SCREEN_W GetScreenWidth()
+#define SCREEN_H GetScreenHeight()
+#define BASE_W   1280
+#define BASE_H   720
 
 // Colour palette
 #define COL_BG        (Color){  22,  24,  31, 255 }

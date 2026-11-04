@@ -1,11 +1,89 @@
 CFD-PROGRESS 1
-c-hello 0 1 83
+c-hello 1 1 119
 #include <stdio.h>
 
 int main(void)
 {
+    // Print Hello, World! here
     printf("Hello, World!");
+    
+    return 0;
+}
+
+c-variables 1 1 229
+#include <stdio.h>
+
+int main(void)
+{
+    int age = 21;
+    float height = 1.80f;
+    char initial = 'J';
+
+    printf("Age: %d\n", age);
+    printf("Height: %.2f\n", height);
+    printf("Initial: %c\n", initial);
 
     return 0;
 }
+
+c-decisions 1 1 377
+#include <stdio.h>
+
+int main(void)
+{
+    int score;
+    scanf("%d", &score);
+
+    if (score >= 90) {
+        printf("Grade: A\n");
+    } else if (score >= 80) {
+        printf("Grade: B\n");
+    } else if (score >= 70) {
+        printf("Grade: C\n");
+    } else if (score >= 60) {
+        printf("Grade: D\n");
+    } else {
+        printf("Grade: F\n");
+    }
+
+    return 0;
+}
+
+c-loops 1 1 228
+#include <stdio.h>
+
+int main(void)
+{
+    int n;
+    scanf("%d", &n);
+
+    int total = 0;
+    for (int i = 1; i <= n; i++) {
+        printf("%d\n", i);
+        total += i;
+    }
+    printf("Total: %d\n", total);
+
+    return 0;
+}
+
+c-functions 0 1 212
+#include <stdio.h>
+
+// Write square() here
+
+// Write is_even() here
+
+int main(void)
+{
+    int n;
+    scanf("%d", &n);
+
+    // Print:  Square: <n squared>
+    // Then:   Even: yes   (or Even: no)
+
+    return 0;
+}
+
+c-pointers 0 1 0
 

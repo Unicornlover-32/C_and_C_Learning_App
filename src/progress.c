@@ -5,9 +5,13 @@
 //   <exactly that many bytes of code>
 //   ...one block per tutorial...
 //
-// Tutorials are matched by id, so adding or reordering tutorials keeps old progress.
+// Bigger projects use the same block, with the number of finished steps in place of
+// "completed" and 0 for "quiz passed".
+//
+// Tutorials and projects are matched by id, so adding or reordering them keeps old progress.
 #include "progress.h"
 #include "tutorials.h"
+#include "projects.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -17,6 +21,13 @@ static int FindTutorial(const char *id)
 {
     for (int i = 0; i < TutorialCount() && i < MAX_TUTORIALS; i++)
         if (strcmp(GetTutorial(i)->id, id) == 0) return i;
+    return -1;
+}
+
+static int FindProject(const char *id)
+{
+    for (int i = 0; i < ProjectCount() && i < MAX_PROJECTS; i++)
+        if (strcmp(GetProject(i)->id, id) == 0) return i;
     return -1;
 }
 
@@ -38,8 +49,9 @@ void ProgressLoad(Progress *p, const char *path)
         if (fgetc(f) != '\n' || len < 0 || len >= EDITOR_CAP) break;
 
         int t = FindTutorial(id);
+        int pr = (t < 0) ? FindProject(id) : -1;
         static char discard[EDITOR_CAP];
-        char *dst = (t >= 0) ? p->drafts[t] : discard;
+        char *dst = (t >= 0) ? p->drafts[t] : (pr >= 0) ? p->projDrafts[pr] : discard;
         if (fread(dst, 1, (size_t)len, f) != (size_t)len) break;
         dst[len] = '\0';
         fgetc(f);   // newline after the code
@@ -48,6 +60,9 @@ void ProgressLoad(Progress *p, const char *path)
             p->completed[t] = (done != 0);
             p->quizPassed[t] = (quiz != 0);
             p->hasDraft[t] = (len > 0);
+        } else if (pr >= 0) {
+            p->projSteps[pr] = done;
+            p->projHasDraft[pr] = (len > 0);
         }
     }
     fclose(f);
