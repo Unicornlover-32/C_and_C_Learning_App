@@ -23,6 +23,7 @@ typedef struct {
     const char *summary;    // one line for the project list
     const char *intro;      // a paragraph for the project overview
     const char *needs;      // which tutorials to do first
+    const char *lecture;    // which lecture notes it is based on
     const char *starterCode;
 
     int         stepCount;

@@ -25,6 +25,7 @@ typedef struct {
 
     int    tut;                 // current tutorial
     int    page;                // current lesson page
+    float  lessonScroll;        // for lesson pages taller than the panel
     float  listScroll;
     float  projListScroll;
 
@@ -136,10 +137,16 @@ static Rectangle ContentPanel(void)
 
 static float NavY(void) { return SCREEN_H - 93.0f; }   // the row of buttons under ContentPanel()
 
+static void SetPage(int page)
+{
+    app.page = page;
+    app.lessonScroll = 0;
+}
+
 static void OpenLesson(int tut, int page)
 {
     app.tut = tut;
-    app.page = page;
+    SetPage(page);
     app.screen = SCREEN_LESSON;
 }
 
@@ -249,7 +256,7 @@ static void ScreenMainMenu(void)
 
     UiTextCentered("{ }", cx, top + 85, 64, COL_ACCENT);
     UiTextCentered("C and C++ for Dummies", cx, top + 170, 64, COL_TEXT);
-    UiTextCentered("Learn to code in C and C++, one small step at a time.", cx, top + 248, 24, COL_MUTED);
+    UiTextCentered("Learn C and C++ step by step, following the Advanced Programming lecture notes.", cx, top + 248, 24, COL_MUTED);
 
     // Progress bar
     int done = CountCompleted();
@@ -295,7 +302,7 @@ static void ScreenTutorials(void)
 
     float contentH = 24;
     for (int i = 0; i < count; i++) {
-        if (i == 0 || GetTutorial(i)->lang != GetTutorial(i - 1)->lang) contentH += headH;
+        if (GetTutorial(i)->section) contentH += headH;
         contentH += cardH + gap;
     }
     float viewH = SCREEN_H - top;
@@ -315,13 +322,11 @@ static void ScreenTutorials(void)
     for (int i = 0; i < count; i++) {
         const Tutorial *t = GetTutorial(i);
 
-        // Section heading when the language changes
-        if (i == 0 || t->lang != GetTutorial(i - 1)->lang) {
-            bool isC = (t->lang == LANG_C);
-            const char *name = isC ? "C" : "C++";
-            UiText(name, cardX + 4, y + 14, 34, COL_ACCENT);
-            UiText(isC ? "The foundations - start here." : "Builds on everything in the C section.",
-                   cardX + 4 + UiTextWidth(name, 34) + 18, y + 26, 19, COL_MUTED);
+        // Section heading at the start of each section
+        if (t->section) {
+            UiText(t->section, cardX + 4, y + 14, 34, COL_ACCENT);
+            if (t->sectionBlurb)
+                UiText(t->sectionBlurb, cardX + 4 + UiTextWidth(t->section, 34) + 18, y + 26, 19, COL_MUTED);
             y += headH;
         }
 
@@ -336,6 +341,10 @@ static void ScreenTutorials(void)
         UiTextCentered(TextFormat("%d", i + 1), circleX, circleY - 13, 26, WHITE);
 
         UiText(t->title, card.x + 100, card.y + 18, 26, COL_TEXT);
+        if (t->lecture) {
+            const char *lecture = TextFormat("Lecture: %s", t->lecture);
+            UiText(lecture, card.x + card.width - 30 - UiTextWidth(lecture, 15), card.y + 12, 15, COL_ACCENT);
+        }
         UiText(t->summary, card.x + 100, card.y + 56, 18, COL_MUTED);
 
         const char *status;
@@ -363,13 +372,14 @@ static void ScreenLesson(void)
     bool needsQuiz = t->quizCount > 0 && !prog.quizPassed[app.tut];
 
     if (IsKeyPressed(KEY_ESCAPE)) { app.screen = SCREEN_TUTORIALS; return; }
-    if (IsKeyPressed(KEY_RIGHT) && app.page < last) app.page++;
-    if (IsKeyPressed(KEY_LEFT) && app.page > 0) app.page--;
+    if (IsKeyPressed(KEY_RIGHT) && app.page < last) SetPage(app.page + 1);
+    if (IsKeyPressed(KEY_LEFT) && app.page > 0) SetPage(app.page - 1);
 
     const LessonPage *p = &t->pages[app.page];
 
     DrawTopBar(TextFormat("%d. %s", app.tut + 1, t->title));
-    TopBarRight(TextFormat("Page %d of %d", app.page + 1, t->pageCount), COL_MUTED);
+    if (t->lecture) TopBarRight(TextFormat("Lecture: %s   -   Page %d of %d", t->lecture, app.page + 1, t->pageCount), COL_MUTED);
+    else TopBarRight(TextFormat("Page %d of %d", app.page + 1, t->pageCount), COL_MUTED);
     if (BackButton("< Tutorials")) { app.screen = SCREEN_TUTORIALS; return; }
 
     // Content
@@ -377,12 +387,50 @@ static void ScreenLesson(void)
     float left = panel.x, right = panel.x + panel.width, navY = NavY();
     DrawRectangleRounded(panel, 0.04f, 8, COL_PANEL);
     float x = panel.x + 40, w = panel.width - 80;
-    float y = panel.y + 32;
 
-    UiText(p->heading, x, y, 36, COL_TEXT);
+    // Pages marked "Extra:" go beyond the lecture notes and get a badge instead of the prefix
+    const char *heading = p->heading;
+    bool extra = strncmp(heading, "Extra: ", 7) == 0;
+    if (extra) heading += 7;
+
+    // Long pages scroll (mouse wheel or the up/down keys)
+    float codeH = 0;
+    if (p->code) {
+        int lines = 1;
+        for (const char *c = p->code; *c; c++) if (*c == '\n') lines++;
+        codeH = 14 + lines * 18 * 1.3f + 32;
+    }
+    float contentH = 60 + UiWrappedHeight(p->body, w, 21) + codeH;
+    Rectangle view = { panel.x, panel.y + 16, panel.width, panel.height - 32 };
+    float maxScroll = contentH + 16 - view.height;
+    if (maxScroll < 0) maxScroll = 0;
+    if (CheckCollisionPointRec(GetMousePosition(), panel)) app.lessonScroll -= GetMouseWheelMove() * 50;
+    if (IsKeyDown(KEY_DOWN)) app.lessonScroll += 10;
+    if (IsKeyDown(KEY_UP)) app.lessonScroll -= 10;
+    if (app.lessonScroll > maxScroll) app.lessonScroll = maxScroll;
+    if (app.lessonScroll < 0) app.lessonScroll = 0;
+
+    BeginScissorMode((int)view.x, (int)view.y, (int)view.width, (int)view.height);
+    float y = panel.y + 32 - app.lessonScroll;
+    float hx = x;
+    if (extra) {
+        const char *tag = "EXTRA";
+        float tw = UiTextWidth(tag, 17) + 24;
+        DrawRectangleRounded((Rectangle){ x, y + 5, tw, 30 }, 0.5f, 6, (Color){ 120, 95, 40, 255 });
+        UiText(tag, x + 12, y + 11, 17, (Color){ 255, 225, 150, 255 });
+        hx += tw + 14;
+    }
+    UiText(heading, hx, y, 36, COL_TEXT);
+    if (extra) UiText("Beyond the lecture notes", hx + UiTextWidth(heading, 36) + 18, y + 13, 17, (Color){ 240, 200, 110, 255 });
     y += 60;
     y += UiWrapped(p->body, x, y, w, 21, COL_TEXT);
     if (p->code) UiCodeBlock(p->code, x, y + 14, w, 18);
+    EndScissorMode();
+
+    if (maxScroll > 0) {
+        const char *more = app.lessonScroll < maxScroll ? "scroll for more  v" : "^  top of page: scroll up";
+        UiText(more, right - 24 - UiTextWidth(more, 16), panel.y + panel.height - 26, 16, COL_ACCENT);
+    }
 
     // Page dots
     float dotsW = t->pageCount * 22.0f;
@@ -391,10 +439,10 @@ static void ScreenLesson(void)
 
     // Navigation
     if (app.page > 0 && UiButton((Rectangle){ left, navY, 180, 50 }, "< Previous", COL_PANEL_HI))
-        app.page--;
+        SetPage(app.page - 1);
 
     if (app.page < last) {
-        if (UiButton((Rectangle){ right - 180, navY, 180, 50 }, "Next >", COL_ACCENT)) app.page++;
+        if (UiButton((Rectangle){ right - 180, navY, 180, 50 }, "Next >", COL_ACCENT)) SetPage(app.page + 1);
     } else if (needsQuiz) {
         if (UiButton((Rectangle){ right - 240, navY, 240, 50 }, "Take the Quiz >", COL_ACCENT))
             OpenQuiz(app.tut);
@@ -869,6 +917,8 @@ static void ScreenProjectInfo(void)
     UiText(p->title, x, y, 36, COL_TEXT);
     y += 60;
     y += UiWrapped(p->intro, x, y, w, 21, COL_TEXT) + 6;
+    if (p->lecture)
+        y += UiWrapped(TextFormat("Based on the lecture: %s", p->lecture), x, y, w, 18, COL_ACCENT) + 2;
     y += UiWrapped(TextFormat("Best after these tutorials: %s", p->needs), x, y, w, 18, COL_MUTED) + 18;
 
     // The steps: finished ones and the next one can be opened directly

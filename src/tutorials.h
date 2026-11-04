@@ -3,7 +3,7 @@
 
 #include "runner.h"
 
-#define MAX_PAGES   6
+#define MAX_PAGES   8
 #define MAX_QUIZ    4
 #define MAX_OPTIONS 4
 
@@ -27,7 +27,13 @@ typedef struct {
     Language    lang;
     const char *title;
     const char *summary;
+    const char *lecture;      // which set of lecture notes this tutorial follows
 
+    // Set on the first tutorial of each section only: the heading shown above it in the list
+    const char *section;
+    const char *sectionBlurb;
+
+    // Pages whose heading starts with "Extra:" cover things the lecture notes leave out
     int        pageCount;
     LessonPage pages[MAX_PAGES];
 
@@ -44,7 +50,7 @@ typedef struct {
     TestCase    tests[MAX_TESTS];
 } Tutorial;
 
-// All tutorials in order: the C section first, then C++.
+// All tutorials in course order: the C sections first, then C++.
 int             TutorialCount(void);
 const Tutorial *GetTutorial(int index);
 

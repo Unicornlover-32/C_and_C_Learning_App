@@ -5,7 +5,7 @@
 #include "editor.h"
 
 #define MAX_TUTORIALS 32
-#define MAX_PROJECTS  16
+#define MAX_PROJECTS  24
 #define PROGRESS_FILE "cfd_progress.txt"
 
 // Everything the app remembers between runs, indexed like GetTutorial().
