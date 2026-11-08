@@ -8,6 +8,7 @@ Font gCodeFont;
 static bool uiCustom = false;
 static bool codeCustom = false;
 static bool clickConsumed = false;
+static bool blocked = false;
 static int wantedCursor = MOUSE_CURSOR_DEFAULT;
 static int currentCursor = MOUSE_CURSOR_DEFAULT;
 
@@ -202,9 +203,11 @@ float UiCodeBlock(const char *code, float x, float y, float width, float size)
     return h;
 }
 
+void UiSetBlocked(bool b) { blocked = b; }
+
 bool UiClickArea(Rectangle r, bool *hover)
 {
-    bool h = CheckCollisionPointRec(GetMousePosition(), r);
+    bool h = !blocked && CheckCollisionPointRec(GetMousePosition(), r);
     if (hover) *hover = h;
     if (h) UiSetCursor(MOUSE_CURSOR_POINTING_HAND);
     if (h && !clickConsumed && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {

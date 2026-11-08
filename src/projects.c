@@ -21,6 +21,7 @@ static const Project PROJECTS[] = {
         "rejects bad input and keeps running until it is told to stop.",
     .needs = "Variables, Types and Constants; Input, Maths and Type Conversion; Decisions; Loops",
     .lecture = "Intro to C",
+    .region = 0,
     .starterCode =
         "#include <stdio.h>\n"
         "\n"
@@ -149,6 +150,7 @@ static const Project PROJECTS[] = {
         "You'll also meet %g, a printf format that prints numbers without pointless zeros: 5 instead of 5.000000, and 2.5 instead of 2.500000.",
     .needs = "Input, Maths and Type Conversion; Decisions: if, else and switch; Loops",
     .lecture = "Intro to C",
+    .region = 0,
     .starterCode =
         "#include <stdio.h>\n"
         "\n"
@@ -314,6 +316,7 @@ static const Project PROJECTS[] = {
         "whether the player won.",
     .needs = "Decisions: if, else and switch; Loops",
     .lecture = "Intro to C",
+    .region = 0,
     .starterCode =
         "#include <stdio.h>\n"
         "\n"
@@ -477,6 +480,7 @@ static const Project PROJECTS[] = {
         "You'll also write your own function to turn a score into a letter grade.",
     .needs = "Loops; Arrays and 2D Arrays; Functions and Pass by Value",
     .lecture = "Intro to C",
+    .region = 0,
     .starterCode =
         "#include <stdio.h>\n"
         "\n"
@@ -711,6 +715,7 @@ static const Project PROJECTS[] = {
         "word with blanks, and stop the player from wasting a turn on a letter they already tried.",
     .needs = "Loops; Arrays and 2D Arrays; Strings; Functions and Pass by Value",
     .lecture = "Intro to C",
+    .region = 0,
     .starterCode =
         "#include <stdio.h>\n"
         "#include <string.h>\n"
@@ -993,6 +998,7 @@ static const Project PROJECTS[] = {
         "It's the biggest project so far, so it is split into small steps. Take them one at a time.",
     .needs = "Loops; Arrays and 2D Arrays; Functions and Pass by Value",
     .lecture = "Intro to C",
+    .region = 0,
     .starterCode =
         "#include <stdio.h>\n"
         "\n"
@@ -1260,6 +1266,7 @@ static const Project PROJECTS[] = {
         "It brings together both of the Pointers and Memory Management lectures.",
     .needs = "Pointers, Pointer Arithmetic and Arrays, Memory Management in C",
     .lecture = "Pointers, Memory Management",
+    .region = 1,
     .starterCode =
         "#include <stdio.h>\n"
         "#include <stdlib.h>\n"
@@ -1601,6 +1608,7 @@ static const Project PROJECTS[] = {
         "Every step reads commands such as  move 1 2  and prints the vector after each one.",
     .needs = "Classes and Objects, Constructors and Access Control, Pass by Reference",
     .lecture = "Classes",
+    .region = 2,
     .starterCode =
         "#include <iostream>\n"
         "using namespace std;\n"
@@ -1960,6 +1968,7 @@ static const Project PROJECTS[] = {
         "The program reads commands such as  end 10,  front 5,  delete 20  and  print.",
     .needs = "Linked Lists, Objects, Pointers and Destructors",
     .lecture = "Pointers in C++ and Linked Lists",
+    .region = 2,
     .starterCode =
         "#include <iostream>\n"
         "#include <string>\n"
@@ -2493,6 +2502,7 @@ static const Project PROJECTS[] = {
         "Watch out for the difference between prefix and postfix ++ - it's the heart of the lecture.",
     .needs = "Constructors and Access Control, Function and Operator Overloading",
     .lecture = "Operator Overloading",
+    .region = 2,
     .starterCode =
         "#include <iostream>\n"
         "using namespace std;\n"
@@ -2826,6 +2836,7 @@ static const Project PROJECTS[] = {
         "The stack keeps its items in a std::vector, so you'll also practise push_back, back, pop_back and size.",
     .needs = "Templates, Strings, Vectors and Iterators",
     .lecture = "Templates and STL",
+    .region = 3,
     .starterCode =
         "#include <iostream>\n"
         "#include <string>\n"
@@ -3075,6 +3086,7 @@ static const Project PROJECTS[] = {
         "This is how many real command-line tools work: read a command word, then decide what to do with the rest of the line.",
     .needs = "Hello, C++; Strings, Vectors and Iterators",
     .lecture = "Templates and STL",
+    .region = 3,
     .starterCode =
         "#include <iostream>\n"
         "#include <string>\n"
@@ -3258,6 +3270,7 @@ static const Project PROJECTS[] = {
         "You'll store student records in a vector, rank them by score, remove the students who were absent and finish with some statistics.",
     .needs = "Strings, Vectors and Iterators, STL Algorithms",
     .lecture = "Templates and STL",
+    .region = 3,
     .starterCode =
         "#include <iostream>\n"
         "#include <string>\n"
@@ -3529,6 +3542,7 @@ static const Project PROJECTS[] = {
         "The last step looks words up safely, without falling into the [] trap.",
     .needs = "Strings, Vectors and Iterators, std::map",
     .lecture = "STL Lists and Maps",
+    .region = 3,
     .starterCode =
         "#include <iostream>\n"
         "#include <map>\n"
@@ -3780,6 +3794,7 @@ static const Project PROJECTS[] = {
         "You'll use [], find, count, erase and an iterator loop, and keep two maps in step with each other.",
     .needs = "std::map",
     .lecture = "STL Lists and Maps",
+    .region = 3,
     .starterCode =
         "#include <iostream>\n"
         "#include <map>\n"

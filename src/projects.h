@@ -24,6 +24,7 @@ typedef struct {
     const char *intro;      // a paragraph for the project overview
     const char *needs;      // which tutorials to do first
     const char *lecture;    // which lecture notes it is based on
+    int         region;     // which map region its factory is in (0-3)
     const char *starterCode;
 
     int         stepCount;

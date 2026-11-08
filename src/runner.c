@@ -265,17 +265,46 @@ static RunStatus RunWithLimit(void)
 
 // ---------------------------------------------------------------------------
 
-void RunPractice(const char *code, Language lang, const TestCase *tests, int testCount, RunResult *out)
+#define EVENTS_FILE "cfd_events.txt"
+
+// The game writes "END WIN" or "END FAIL <reason>" as its last line.
+static void ReadVerdict(const char *events, bool *won, char *verdict)
+{
+    *won = false;
+    verdict[0] = '\0';
+    const char *last = NULL;
+    for (const char *p = events; (p = strstr(p, "END ")) != NULL; p++)
+        if (p == events || p[-1] == '\n') last = p;
+    if (!last) return;
+    if (strncmp(last, "END WIN", 7) == 0) { *won = true; return; }
+    if (strncmp(last, "END FAIL ", 9) == 0) {
+        int n = 0;
+        for (const char *s = last + 9; *s && *s != '\n' && *s != '\r' && n < VERDICT_CAP - 1; s++) verdict[n++] = *s;
+        verdict[n] = '\0';
+    }
+}
+
+void RunProgram(const RunRequest *req, RunResult *out)
 {
     memset(out, 0, sizeof(*out));
-    if (testCount > MAX_TESTS) testCount = MAX_TESTS;
+    int testCount = req->testCount > MAX_TESTS ? MAX_TESTS : req->testCount;
     out->testCount = testCount;
+    Language lang = req->lang;
 
+    // The game's header goes in front, then a #line so compiler errors still
+    // point at the right line of the student's own code.
     const char *src = (lang == LANG_CPP) ? SRC_CPP : SRC_C;
-    if (!WriteText(src, code)) {
+    FILE *f = fopen(src, "wb");
+    if (!f) {
         snprintf(out->compileLog, LOG_CAP, "Could not save your code to %s.", src);
         return;
     }
+    if (req->prelude) {
+        fputs(req->prelude, f);
+        fprintf(f, "\n#define main cfd_student_main\n#line 1 \"%s\"\n", lang == LANG_CPP ? "your_code.cpp" : "your_code.c");
+    }
+    fputs(req->code, f);
+    fclose(f);
 
     if (!EnsureCompilerOnPath()) {
         snprintf(out->compileLog, LOG_CAP,
@@ -288,11 +317,13 @@ void RunPractice(const char *code, Language lang, const TestCase *tests, int tes
     }
 
     // Compile
-    char cmd[512];
+    char include[600] = "";
+    if (req->includeDir) snprintf(include, sizeof(include), "-I\"%s\" ", req->includeDir);
+    char cmd[1024];
     if (lang == LANG_CPP)
-        snprintf(cmd, sizeof(cmd), "%s -Wall -std=c++17 -o %s %s 2> %s", CFD_CXX, EXE_FILE, src, LOG_FILE);
+        snprintf(cmd, sizeof(cmd), "%s -Wall -std=c++17 %s-o %s %s 2> %s", CFD_CXX, include, EXE_FILE, src, LOG_FILE);
     else
-        snprintf(cmd, sizeof(cmd), "%s -Wall -o %s %s -lm 2> %s", CFD_CC, EXE_FILE, src, LOG_FILE);
+        snprintf(cmd, sizeof(cmd), "%s -Wall %s-o %s %s -lm 2> %s", CFD_CC, include, EXE_FILE, src, LOG_FILE);
 
     remove(EXE_FILE);
     int rc = system(cmd);
@@ -311,18 +342,32 @@ void RunPractice(const char *code, Language lang, const TestCase *tests, int tes
     // Run every test case
     out->allPassed = true;
     for (int i = 0; i < testCount; i++) {
-        char raw[OUTPUT_CAP], got[OUTPUT_CAP], want[OUTPUT_CAP];
+        static char raw[OUTPUT_CAP], got[OUTPUT_CAP], want[OUTPUT_CAP];
+        const TestCase *tc = &req->tests[i];
 
-        WriteText(IN_FILE, tests[i].input ? tests[i].input : "");
+        WriteText(IN_FILE, tc->input ? tc->input : "");
         remove(OUT_FILE);
+        remove(EVENTS_FILE);
         RunStatus status = RunWithLimit();
 
         ReadText(OUT_FILE, raw, sizeof(raw));
         Normalize(raw, got, sizeof(got));
-        Normalize(tests[i].expected, want, sizeof(want));
-
         out->status[i] = status;
-        out->passed[i] = (status == RUN_OK && strcmp(got, want) == 0);
+        if (tc->expected) {
+            Normalize(tc->expected, want, sizeof(want));
+            out->outputOk[i] = (strcmp(got, want) == 0);
+        } else {
+            out->outputOk[i] = true;
+        }
+
+        if (req->game) {
+            ReadText(EVENTS_FILE, out->events[i], EVENTS_CAP);
+            ReadVerdict(out->events[i], &out->won[i], out->verdict[i]);
+        } else {
+            out->won[i] = true;
+        }
+
+        out->passed[i] = (status == RUN_OK && out->outputOk[i] && out->won[i]);
         if (!out->passed[i]) out->allPassed = false;
 
         const char *note = NULL;
@@ -341,4 +386,11 @@ void RunPractice(const char *code, Language lang, const TestCase *tests, int tes
     remove(IN_FILE);
     remove(OUT_FILE);
     remove(LOG_FILE);
+    remove(EVENTS_FILE);
+}
+
+void RunPractice(const char *code, Language lang, const TestCase *tests, int testCount, RunResult *out)
+{
+    RunRequest req = { code, lang, NULL, NULL, false, tests, testCount };
+    RunProgram(&req, out);
 }

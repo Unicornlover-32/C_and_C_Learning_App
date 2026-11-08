@@ -1,5 +1,20 @@
-CFD-PROGRESS 1
-c-hello 1 1 119
+CFD-PROGRESS 2
+PLAYER 150 257 1 1 20261108 0
+LEVEL c-hello 1 1
+LEVEL c-functions-arrays 0 1
+MISSION robot-hello 5 150
+#include <stdio.h>
+
+int main(void)
+{
+    // 1. Radio in: print Hello, World!
+
+    // 2. Drive to the exit: one move(); for each tile
+
+    return 0;
+}
+
+MISSION c-hello 1 119
 #include <stdio.h>
 
 int main(void)
@@ -7,6 +22,16 @@ int main(void)
     // Print Hello, World! here
     printf("Hello, World!");
     
+    return 0;
+}
+
+PROJECT proj-temperature 0 126
+#include <stdio.h>
+
+int main(void)
+{
+    // Step 1: read a temperature in Celsius and print it in Fahrenheit
+
     return 0;
 }
 

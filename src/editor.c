@@ -518,3 +518,44 @@ void EditorDraw(const Editor *e, Rectangle b)
     EndScissorMode();
     DrawRectangleLinesEx(b, 1, e->focused ? COL_ACCENT : COL_BORDER);
 }
+
+// ---------------------------------------------------------------- lines, for things drawn beside the code
+
+float EditorLineHeight(const Editor *e) { return LineH(e); }
+
+float EditorLineY(const Editor *e, Rectangle b, int line)
+{
+    return b.y + PAD - e->scrollY + line * LineH(e);
+}
+
+void EditorGotoLine(Editor *e, Rectangle b, int line)
+{
+    int ls = IndexOfLine(e, line);
+    int le = LineEnd(e, ls);
+    e->cursor = e->anchor = le;
+    e->focused = true;
+    e->blink = 0;
+    e->lastEditKind = EDIT_NONE;
+    float viewH = b.height - PAD * 2;
+    float cy = line * LineH(e);
+    if (cy < e->scrollY || cy + LineH(e) > e->scrollY + viewH) e->scrollY = cy - viewH / 2;
+    if (e->scrollY < 0) e->scrollY = 0;
+}
+
+int EditorFindLine(const Editor *e, const char *text, int near)
+{
+    int best = -1, bestDist = 1 << 30;
+    int len = (int)strlen(text);
+    int line = 0, ls = 0;
+    for (;;) {
+        int le = LineEnd(e, ls);
+        if (le - ls == len && strncmp(e->text + ls, text, (size_t)len) == 0) {
+            int d = line > near ? line - near : near - line;
+            if (d < bestDist) { bestDist = d; best = line; }
+        }
+        if (le >= e->len) break;
+        ls = le + 1;
+        line++;
+    }
+    return best;
+}

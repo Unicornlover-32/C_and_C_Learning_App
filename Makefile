@@ -43,6 +43,6 @@ run: $(TARGET)
 	./$(TARGET)
 
 clean:
-	rm -f $(TARGET) cfd_practice cfd_practice.exe cfd_practice.c
+	rm -f $(TARGET) cfd_practice cfd_practice.exe cfd_practice.c cfd_practice.cpp cfd_events.txt
 
 .PHONY: run clean

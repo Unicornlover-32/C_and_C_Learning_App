@@ -46,4 +46,12 @@ void EditorRedo(Editor *e);
 void EditorUpdate(Editor *e, Rectangle bounds);
 void EditorDraw(const Editor *e, Rectangle bounds);
 
+// Where line `line` (counting from 0) is drawn, so other things can be placed beside it
+float EditorLineY(const Editor *e, Rectangle bounds, int line);
+float EditorLineHeight(const Editor *e);
+// Puts the cursor at the end of a line and scrolls it into view
+void  EditorGotoLine(Editor *e, Rectangle bounds, int line);
+// The line whose text is exactly `text`, nearest to line `near`; -1 if there is none
+int   EditorFindLine(const Editor *e, const char *text, int near);
+
 #endif

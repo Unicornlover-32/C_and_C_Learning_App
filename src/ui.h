@@ -53,6 +53,9 @@ float UiCode(const char *text, float x, float y, float size, Color color, float 
 // A code snippet drawn in a dark rounded box, with syntax colours. Returns the height used.
 float UiCodeBlock(const char *code, float x, float y, float width, float size);
 
+// While blocked (a pop-up card is showing on top), click areas and buttons ignore the mouse.
+void  UiSetBlocked(bool blocked);
+
 // Clickable area / button. Only one click is accepted per frame.
 bool  UiClickArea(Rectangle r, bool *hover);
 bool  UiButton(Rectangle r, const char *label, Color base);
