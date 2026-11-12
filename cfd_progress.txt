@@ -14,6 +14,52 @@ int main(void)
     return 0;
 }
 
+MISSION robot-labyrinth 0 102
+#include <stdio.h>
+
+int main(void)
+{
+    // Escape any maze with the right-hand rule
+
+    return 0;
+}
+
+MISSION heist-bigheist 0 256
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void)
+{
+    // 1. Count the houses on the trail
+
+    // 2. malloc a list for their numbers
+
+    // 3. Rob the trail and fill the list
+
+    // 4. report(), print the totals, 5. free the list
+
+    return 0;
+}
+
+MISSION factory-mega 0 272
+#include <iostream>
+#include <map>
+#include <string>
+#include <vector>
+#include <algorithm>
+using namespace std;
+
+int main()
+{
+    map<string, int> stock;
+    string item;
+    int quantity;
+
+    // Total the crates, then filter, sort and print the report
+
+    return 0;
+}
+
 MISSION c-hello 1 119
 #include <stdio.h>
 

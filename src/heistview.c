@@ -230,7 +230,7 @@ static void Apply(const HEvent *e)
             }
             break;
         case 'U':
-            snprintf(play.gadget, sizeof(play.gadget), "%s", e->text);
+            snprintf(play.gadget, sizeof(play.gadget), "%.*s", (int)sizeof(play.gadget) - 1, e->text);
             play.gadgetDoor = e->a;
             play.pos = e->a + 1;
             play.noise += strcmp(e->text, "pick") == 0 ? 1 : strcmp(e->text, "drill") == 0 ? 3 : strcmp(e->text, "blast") == 0 ? 10 : 0;

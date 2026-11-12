@@ -52,8 +52,8 @@ const char *CompilerName(Language lang) { return lang == LANG_CPP ? CFD_CXX : CF
 #if defined(_WIN32)
 static bool DirHasGcc(const char *dir)
 {
-    char path[MAX_PATH];
-    snprintf(path, sizeof(path), "%s\\gcc.exe", dir);
+    char path[MAX_PATH + 16];
+    snprintf(path, sizeof(path), "%.*s\\gcc.exe", MAX_PATH - 1, dir);
     return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
 }
 
@@ -86,7 +86,7 @@ static bool EnsureCompilerOnPath(void)
         if (!DirHasGcc(candidates[i])) continue;
         // Turn "...\App\..\..\w64devkit\bin" into a clean "C:\raylib\w64devkit\bin"
         char full[MAX_PATH];
-        if (!GetFullPathNameA(candidates[i], MAX_PATH, full, NULL)) snprintf(full, sizeof(full), "%s", candidates[i]);
+        if (!GetFullPathNameA(candidates[i], MAX_PATH, full, NULL)) snprintf(full, sizeof(full), "%.*s", MAX_PATH - 1, candidates[i]);
         // _putenv updates both the C runtime's copy (used by system()) and Windows' copy
         static char env[32768];
         const char *old = getenv("PATH");
@@ -131,9 +131,10 @@ static bool FileThere(const char *path)
 
 // Removes '\r', trailing spaces on every line and blank lines at the end,
 // so "Hello\r\n" and "Hello  \n\n" both match "Hello".
-static void Normalize(const char *src, char *dst, size_t cap)
+void NormalizeOutput(const char *src, char *dst, unsigned long cap)
 {
-    size_t n = 0, lineStart = 0;
+    if (cap == 0) return;
+    unsigned long n = 0, lineStart = 0;
     for (const char *p = src; *p && n + 1 < cap; p++) {
         if (*p == '\r') continue;
         if (*p == '\n') {
@@ -351,10 +352,11 @@ void RunProgram(const RunRequest *req, RunResult *out)
         RunStatus status = RunWithLimit();
 
         ReadText(OUT_FILE, raw, sizeof(raw));
-        Normalize(raw, got, sizeof(got));
+        NormalizeOutput(raw, got, sizeof(got));
         out->status[i] = status;
+        memcpy(out->output[i], got, sizeof(got));
         if (tc->expected) {
-            Normalize(tc->expected, want, sizeof(want));
+            NormalizeOutput(tc->expected, want, sizeof(want));
             out->outputOk[i] = (strcmp(got, want) == 0);
         } else {
             out->outputOk[i] = true;

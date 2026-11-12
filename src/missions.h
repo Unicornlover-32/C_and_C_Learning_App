@@ -11,9 +11,10 @@
 // output, like the original projects.
 typedef enum { MODE_FACTORY, MODE_ROBOT, MODE_HEIST, MODE_BUGS } GameMode;
 
-// Where a mission sits on the map: the main game of a level, an extra one, or the boss
-// at the end of a region.
-typedef enum { ROLE_MAIN, ROLE_BONUS, ROLE_BOSS } MissionRole;
+// Where a mission sits on the map: the main game of a level (its own project), a bonus
+// round (Bug Hunter), the boss at the end of a region, or an optional side quest (Robot
+// Rescue and Memory Heist), whose stars are counted separately.
+typedef enum { ROLE_MAIN, ROLE_BONUS, ROLE_BOSS, ROLE_SIDE } MissionRole;
 
 // A Bug Hunter bug: the line as it should be (found in the base solution) and the
 // broken version that replaces it. Either may span several lines.
@@ -89,7 +90,7 @@ const MissionInfo *GetMission(int index);
 int                FindMission(const char *id);
 
 int  MainMissionOf(int tut);              // the level's headline mission
-int  LevelMissions(int tut, int *out);    // main first, then the extras; returns how many
+int  LevelMissions(int tut, int *out);    // main first, then side quests, then bonus rounds; returns how many
 int  BossOf(int region);                  // -1 if the region has none
 
 int  RegionCount(void);

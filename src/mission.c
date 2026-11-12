@@ -1,4 +1,7 @@
 // The mission screen: the task on the left, the code editor, and the game on the right.
+//   3D levels    - a level's own project: the brief and the editor on the left, and the
+//                  level's 3D scene on the right, played from the program's real output
+//                  for each test, with the expected and actual output underneath
 //   Code Factory - each test is a crate on a conveyor belt; wrong output falls off the belt
 //   Robot Rescue - the maze, and a replay of what the robot did
 //   Memory Heist - the street of memory, and a replay of what the thief did
@@ -8,6 +11,7 @@
 #include "editor.h"
 #include "robotview.h"
 #include "heistview.h"
+#include "game/levels.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -58,13 +62,18 @@ static struct {
     int    bugAt[MAX_BUGS];      // where each bug was last seen
 
     // the mission-complete card
-    bool          celebrate;
+    bool          celebrate, burst;
     double        celebrateAt;
     unsigned char before, earned;
     int           xp;
+
+    // 3D levels
+    bool   details;              // the plain text results instead of the scene
+    bool   bigView;              // the scene fills the screen (the code is one click away)
 } ms = { .mission = -1 };
 
 static Rectangle editorRect;     // where the editor was drawn this frame
+static Rectangle levelView;      // where the 3D level was drawn this frame
 
 // ---------------------------------------------------------------- the task
 
@@ -85,6 +94,24 @@ static Task CurTask(void)
 }
 
 static bool IsGame(GameMode mode) { return mode == MODE_ROBOT || mode == MODE_HEIST; }
+
+// The 3D level this mission plays as: a level's own project, and its Bug Hunter round
+// (same tests, same output), play that level; every other program (the Factory Contracts,
+// the factory boss) plays the Assembly Line, which reads any output line by line
+static const LevelDef *CurLevel(void)
+{
+    if (ms.inContract) return &LEVEL_FACTORY;
+    if (ms.mission < 0) return NULL;
+    const MissionInfo *m = Cur();
+    if (m->tut >= 0 && ((m->role == ROLE_MAIN && m->mode == MODE_FACTORY) || m->mode == MODE_BUGS)) {
+        const LevelDef *lv = LevelFor(GetTutorial(m->tut)->id);
+        if (lv) return lv;
+    }
+    if (m->mode == MODE_FACTORY || m->mode == MODE_BUGS) return &LEVEL_FACTORY;
+    if (m->mode == MODE_ROBOT) return &LEVEL_ROBOT;
+    if (m->mode == MODE_HEIST) return &LEVEL_HEIST;
+    return NULL;
+}
 
 void MissionInit(void) { EditorInit(&editor, 20); }
 void MissionShutdown(void) { EditorFree(&editor); }
@@ -114,13 +141,17 @@ static void ResetPanel(void)
     ms.sel = 0;
     ms.crate = -1;
     ms.celebrate = false;
+    ms.burst = false;
     ms.timeUp = false;
     ms.squashed = false;
+    ms.details = false;
+    ms.bigView = false;
     ms.startTime = GetTime();
     for (int i = 0; i < MAX_BUGS; i++) ms.bugAt[i] = -1;
     Task t = CurTask();
     if (t.mode == MODE_ROBOT) RobotLoad(t.tests, t.testCount);
     if (t.mode == MODE_HEIST) HeistLoad(t.tests, t.testCount);
+    PlaybackOpen(CurLevel(), t.tests, t.testCount);
     if (!ms.inContract && t.mode == MODE_BUGS)
         for (int i = 0; i < Cur()->bugCount; i++) ms.bugAt[i] = Cur()->bugs[i].bugLine;
 }
@@ -193,7 +224,7 @@ static void ShowTest(int test)
 {
     Task t = CurTask();
     ms.sel = test;
-    if (!ms.hasResult || !result.compiled) return;
+    if (!ms.hasResult || !result.compiled || CurLevel()) return;    // a 3D level plays every test itself
     if (t.mode == MODE_ROBOT) RobotPlay(test, result.events[test], result.won[test]);
     if (t.mode == MODE_HEIST) HeistPlay(test, result.events[test], result.won[test], result.status[test] == RUN_CRASHED);
 }
@@ -228,7 +259,8 @@ static void OnSuccess(const Task *t)
     }
     ms.celebrate = true;
     ms.celebrateAt = GetTime() + (IsGame(t->mode) ? 1.6 : 0.9);   // let the replay play first
-    ParticlesBurst(SCREEN_W / 2.0f, SCREEN_H * 0.45f, 90, 420);
+    ms.burst = false;
+    if (!CurLevel()) { ParticlesBurst(SCREEN_W / 2.0f, SCREEN_H * 0.45f, 90, 420); ms.burst = true; }
 }
 
 static void DoRun(void)
@@ -247,6 +279,10 @@ static void DoRun(void)
 
     int fail = FirstFailure();
     ShowTest(fail >= 0 ? fail : 0);
+    if (CurLevel()) {
+        if (result.compiled) PlaybackRun(&result);
+        else PlaybackCompileFailed();
+    }
     if (result.allPassed) OnSuccess(&t);
 }
 
@@ -644,6 +680,8 @@ static void DrawStepPicker(float right, float y)
     }
 }
 
+static void Buttons(Rectangle runBtn, Rectangle hintBtn, Rectangle solBtn, Rectangle rstBtn, const Task *t);
+
 static void DrawLeftPanel(Rectangle left, const Task *t)
 {
     DrawRectangleRounded(left, 0.03f, 8, COL_PANEL);
@@ -716,6 +754,12 @@ static void DrawLeftPanel(Rectangle left, const Task *t)
         UiText(more, tag.x + 8, tag.y + 3, 14, COL_ACCENT);
     }
 
+    Buttons(runBtn, hintBtn, solBtn, rstBtn, t);
+}
+
+// Run & Check, Hint, Solution and Reset: the same in every layout
+static void Buttons(Rectangle runBtn, Rectangle hintBtn, Rectangle solBtn, Rectangle rstBtn, const Task *t)
+{
     bool locked = (t->mode == MODE_BUGS && ms.timeUp && !ms.squashed);
     if (UiButton(runBtn, ms.runPending ? "Running..." : locked ? "Time's up" : "Run & Check", locked ? COL_PANEL_HI : COL_GOOD_DARK) && !locked)
         ms.runPending = true;
@@ -733,6 +777,7 @@ static void DrawLeftPanel(Rectangle left, const Task *t)
             EditorReplaceAll(&editor, t->solution);
             editor.focused = true;
             ms.hasResult = false;
+            PlaybackClear();
             ms.solutionConfirmAt = 0;
             ms.usedHelp = true;
             snprintf(ms.notice, sizeof(ms.notice),
@@ -749,15 +794,204 @@ static void DrawLeftPanel(Rectangle left, const Task *t)
     }
 }
 
+// ---------------------------------------------------------------- the 3D level layout
+//
+//   left:  the level's name and stars, the brief (or the hint), the editor, the buttons
+//   right: the test tabs and replay controls, the 3D scene, and the output panel where the
+//          program's output appears line by line as the scene acts it out
+
+// The three stars in one row
+static void DrawObjectivesRow(float x, float y, const Task *t)
+{
+    unsigned char have = prog.stars[ms.mission];
+    bool thirdLost = !ms.fresh || (ms.runs > 0 && !(ms.hasResult && result.allPassed && ms.runs == 1));
+    const char *third = "Pass on the first run";
+    if (IsGame(t->mode)) {            // robot and heist missions: the third star is for short code
+        int lines = CountCodeLines(editor.text);
+        third = TextFormat("%d lines or fewer (now %d)", t->parLines, lines);
+        thirdLost = lines > t->parLines;
+    }
+    const char *texts[3] = { t->mode == MODE_BUGS ? "Squash every bug in time" : "Pass every test", "No hint or solution", third };
+    bool lost[3] = { t->mode == MODE_BUGS && ms.timeUp, ms.usedHelp || !ms.fresh, thirdLost };
+    for (int i = 0; i < 3; i++) {
+        bool got = (have >> i) & 1;
+        Vector2 c = { x + 9, y + 10 };
+        if (got) DrawStar(c, 8, COL_GOLD);
+        else DrawStarOutline(c, 8, 1.5f, lost[i] ? COL_BAD : COL_MUTED);
+        UiText(texts[i], x + 22, y + 2, 15, got ? COL_TEXT : lost[i] ? (Color){ 220, 140, 140, 255 } : COL_MUTED);
+        x += 22 + UiTextWidth(texts[i], 15) + 20;
+    }
+}
+
+// The brief (or the hint while it's open), scrolling when it's long
+static void DrawBriefBox(Rectangle r, const Task *t)
+{
+    DrawRectangleRounded(r, 0.06f, 8, COL_PANEL);
+    bool hint = ms.showHint && t->hint;
+    float x = r.x + 16, w = r.width - 32;
+    UiText(hint ? "Hint" : "The brief", x, r.y + 8, 15, hint ? (Color){ 240, 200, 110, 255 } : COL_MUTED);
+    Rectangle area = { r.x, r.y + 30, r.width, r.height - 36 };
+    if (CheckCollisionPointRec(GetMousePosition(), area)) ms.briefScroll -= GetMouseWheelMove() * 40;
+    if (ms.briefScroll < 0) ms.briefScroll = 0;
+
+    BeginScissorMode((int)area.x, (int)area.y, (int)area.width, (int)area.height);
+    float y = area.y - ms.briefScroll;
+    if (ms.notice[0] && !hint) y += UiWrapped(ms.notice, x, y, w, 16, COL_ACCENT) + 8;
+    y += UiWrapped(hint ? t->hint : t->brief, x, y, w, 16, COL_TEXT) + 6;
+    if (t->api && !hint) {
+        UiText(t->mode == MODE_ROBOT ? "The robot understands" : "The game gives you", x, y + 4, 15, ModeColor(t->mode));
+        y += 26;
+        y += UiCode(t->api, x, y, 15, COL_CODE_TEXT, w);
+    }
+    EndScissorMode();
+
+    float maxScroll = (y + ms.briefScroll - area.y) - area.height + 6;
+    if (ms.briefScroll > maxScroll) ms.briefScroll = maxScroll > 0 ? maxScroll : 0;
+    if (maxScroll > 0) {
+        const char *more = ms.briefScroll < maxScroll - 1 ? "scroll for more  v" : "^  scroll up";
+        float mw = UiTextWidth(more, 14) + 16;
+        Rectangle tag = { r.x + r.width - 12 - mw, r.y + 6, mw, 20 };
+        DrawRectangleRounded(tag, 0.5f, 6, COL_PANEL_HI);
+        UiText(more, tag.x + 8, tag.y + 3, 14, COL_ACCENT);
+    }
+}
+
+static void DrawLevelLeft(Rectangle col, const Task *t, const LevelDef *lv, bool overlay)
+{
+    // the level's name, the project and its stars
+    Rectangle head = { col.x, col.y, col.width, 74 };
+    DrawRectangleRounded(head, 0.14f, 8, COL_PANEL);
+    float x = head.x + 16, y = head.y + 10;
+    bool bugs = (t->mode == MODE_BUGS);
+    bool boss = !ms.inContract && Cur()->role == ROLE_BOSS;
+    const char *chip = ms.inContract ? "CONTRACT" : bugs ? "BUG HUNTER" : boss ? "BOSS" : lv->name;
+    Color cc = ms.inContract ? ModeColor(MODE_FACTORY) : bugs ? COL_BUGS : boss ? COL_BAD : lv->color;
+    float cw = UiTextWidth(chip, 15) + 24;
+    DrawRectangleRounded((Rectangle){ x, y, cw, 26 }, 0.5f, 6, ColorAlpha(cc, 0.2f));
+    UiText(chip, x + 12, y + 5, 15, cc);
+    const char *title = t->title;
+    if (ms.inContract) {
+        const Project *p = GetProject(ms.proj);
+        title = TextFormat("Step %d of %d: %s", ms.step + 1, p->stepCount, p->steps[ms.step].title);
+    }
+    BeginScissorMode((int)(x + cw + 10), (int)y, (int)(head.width - cw - 42), 30);
+    UiText(title, x + cw + 12, y + 1, 21, COL_TEXT);
+    EndScissorMode();
+    if (ms.inContract) {
+        UiText("Your code carries on from step to step. Steps:", x, y + 36, 15, COL_MUTED);
+        DrawStepPicker(head.x + head.width - 16, y + 46);
+    } else {
+        DrawObjectivesRow(x, y + 34, t);
+    }
+
+    // the buttons along the bottom
+    float bh = 46, gap = 8;
+    float by = col.y + col.height - bh;
+    float runW = col.width * 0.38f, small = (col.width - runW - gap * 3) / 3;
+    Rectangle runBtn = { col.x, by, runW, bh };
+    Rectangle hintBtn = { col.x + runW + gap, by, small, bh };
+    Rectangle solBtn = { hintBtn.x + small + gap, by, small, bh };
+    Rectangle rstBtn = { solBtn.x + small + gap, by, small, bh };
+
+    // the brief, then the editor
+    float top = head.y + head.height + 8;
+    float clock = bugs ? 34 : 0;
+    float avail = by - 8 - top - clock;
+    float briefH = floorf(avail * 0.3f);
+    if (briefH < 104) briefH = 104;
+    DrawBriefBox((Rectangle){ col.x, top, col.width, briefH }, t);
+    float ey = top + briefH + 8;
+    if (bugs) {
+        DrawBugClock((Rectangle){ col.x, ey, col.width, 26 }, t);
+        ey += clock;
+    }
+    editorRect = (Rectangle){ col.x, ey, col.width, by - 8 - ey };
+    if (!overlay) EditorUpdate(&editor, editorRect);
+    EditorDraw(&editor, editorRect);
+    DrawBugs(t);
+    Buttons(runBtn, hintBtn, solBtn, rstBtn, t);
+}
+
+// The plain text results for the test picked in the tabs
+static void DrawDetails(Rectangle r, const Task *t)
+{
+    DrawRectangleRounded(r, 0.03f, 8, COL_PANEL);
+    Rectangle in = { r.x + 16, r.y + 14, r.width - 32, r.height - 28 };
+    if (ms.runPending) {
+        UiText(TextFormat("Compiling with %s...", CompilerName(t->lang)), in.x, in.y, 20, COL_ACCENT);
+        return;
+    }
+    if (!ms.hasResult) {
+        UiWrapped("The plain text results show up here after Run & Check: each test's input, the output it expects, "
+                  "and exactly what your program printed.", in.x, in.y, in.width, 17, COL_MUTED);
+        return;
+    }
+    if (!result.compiled) {
+        DrawCompileLog(in, "Your code didn't compile. Read the first error, fix it and try again.");
+        return;
+    }
+    int pass = 0;
+    for (int i = 0; i < result.testCount; i++) if (result.passed[i]) pass++;
+    UiText(TextFormat("%d of %d tests passed", pass, result.testCount), in.x, in.y, 21, result.allPassed ? COL_GOOD : COL_BAD);
+    int show = PlaybackTest();
+    if (show < 0 || show >= t->testCount) show = 0;
+    const TestCase *tc = &t->tests[show];
+    const char *how = result.passed[show] ? "passed" : result.status[show] == RUN_CRASHED ? "crashed"
+                    : result.status[show] == RUN_OK ? "failed: the output doesn't match" : "was stopped (too long or too much output)";
+    UiText(TextFormat("Test %d %s", show + 1, how), in.x, in.y + 32, 17, result.passed[show] ? COL_GOOD : COL_BAD);
+    float boxY = in.y + 62, boxH = in.y + in.height - boxY;
+    float colW = (in.width - 24) / 3;
+    DrawOutputBox(TextFormat("Test %d input", show + 1), tc->input ? tc->input : "", (Rectangle){ in.x, boxY, colW, boxH }, COL_MUTED);
+    DrawOutputBox("Expected output", tc->expected, (Rectangle){ in.x + colW + 12, boxY, colW, boxH }, COL_MUTED);
+    DrawOutputBox("Your output", result.actual[show], (Rectangle){ in.x + (colW + 12) * 2, boxY, colW, boxH },
+                  result.passed[show] ? COL_GOOD : COL_BAD);
+}
+
+static void DrawLevelRight(Rectangle area, const Task *t)
+{
+    float bh = 34, bw = 112, gap = 6;
+    Rectangle bigBtn = { area.x + area.width - bw, area.y, bw, bh };
+    Rectangle detBtn = { bigBtn.x - gap - bw, area.y, bw, bh };
+    if (UiButton(bigBtn, ms.bigView ? "Back to code" : "Full view", ms.bigView ? COL_ACCENT : COL_PANEL_HI)) ms.bigView = !ms.bigView;
+    if (UiButton(detBtn, ms.details ? "Show game" : "Show details", COL_PANEL_HI)) ms.details = !ms.details;
+    PlaybackBar((Rectangle){ area.x, area.y, detBtn.x - 14 - area.x, bh });
+
+    float top = area.y + bh + 8;
+    if (ms.details) {
+        DrawDetails((Rectangle){ area.x, top, area.width, area.y + area.height - top }, t);
+        return;
+    }
+    float resultsH = ms.bigView ? 200 : 178;
+    float viewH = area.y + area.height - top - resultsH - 10;
+    if (!ms.bigView && viewH > area.width * 9.0f / 16.0f) viewH = floorf(area.width * 9.0f / 16.0f);
+    if (viewH < 180) viewH = 180;
+    Rectangle view = { area.x, top, area.width, viewH };
+    levelView = view;
+    Rectangle res = { area.x, view.y + view.height + 10, area.width, area.y + area.height - (view.y + view.height + 10) };
+
+    PlaybackDraw(view);
+    if (ms.runPending) {
+        DrawRectangleRec(view, (Color){ 10, 12, 18, 170 });
+        UiTextCentered(TextFormat("Compiling with %s and running every test...", CompilerName(t->lang)),
+                       view.x + view.width / 2, view.y + view.height / 2 - 12, 22, COL_ACCENT);
+    }
+    if (ms.hasResult && !result.compiled) DrawCompileLog(res, "Compiler errors - read the first one first:");
+    else PlaybackResults(res);
+}
+
 // ---------------------------------------------------------------- overlays
 
 static void DrawCelebration(const Task *t)
 {
     if (!ms.celebrate) return;
-    // let the robot or the thief finish the replay before the card covers it
-    if ((t->mode == MODE_ROBOT && RobotPlaying()) || (t->mode == MODE_HEIST && HeistPlaying()))
+    // let the replay (or the 3D level's playback) finish before the card covers it
+    if ((t->mode == MODE_ROBOT && RobotPlaying()) || (t->mode == MODE_HEIST && HeistPlaying()) || (CurLevel() && PlaybackBusy()))
         ms.celebrateAt = GetTime() + 0.8;
     if (GetTime() < ms.celebrateAt) return;
+    if (!ms.burst) {
+        ms.burst = true;
+        ParticlesBurst(SCREEN_W / 2.0f, SCREEN_H * 0.45f, 90, 420);
+    }
     DrawRectangle(0, 0, SCREEN_W, SCREEN_H, ColorAlpha(BLACK, 0.55f));
     float cw = 560, ch = ms.inContract ? 300 : 400;
     Rectangle card = { (SCREEN_W - cw) / 2, (SCREEN_H - ch) / 2, cw, ch };
@@ -771,6 +1005,7 @@ static void DrawCelebration(const Task *t)
     else if (t->mode == MODE_BUGS) title = "BUGS SQUASHED!";
     else if (t->mode == MODE_ROBOT) title = "ROBOT RESCUED!";
     else if (t->mode == MODE_HEIST) title = "CLEAN GETAWAY!";
+    else if (CurLevel()) title = "LEVEL CLEAR!";
     else title = "ORDER SHIPPED!";
     DrawModeIcon(t->mode, (Vector2){ cx, y + 24 }, 52);
     y += 60;
@@ -845,17 +1080,22 @@ static void DrawTimeUp(void)
 void ScreenMission(void)
 {
     Task t = CurTask();
+    const LevelDef *lv = CurLevel();
 
     // A run was asked for last frame (after "Compiling..." was drawn)
     if (ms.runPending) DoRun();
 
-    bool replaying = (t.mode == MODE_ROBOT && RobotPlaying()) || (t.mode == MODE_HEIST && HeistPlaying());
+    bool replaying = (t.mode == MODE_ROBOT && RobotPlaying()) || (t.mode == MODE_HEIST && HeistPlaying()) || (lv && PlaybackBusy());
     bool overlay = (ms.celebrate && GetTime() >= ms.celebrateAt && !replaying) || (t.mode == MODE_BUGS && ms.timeUp && !ms.squashed);
     if (!overlay) {
         if (CtrlDown() && IsKeyPressed(KEY_ENTER) && !(t.mode == MODE_BUGS && ms.timeUp)) ms.runPending = true;
-        if (IsKeyPressed(KEY_ESCAPE)) { GoBack(); return; }
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            if (ms.bigView) ms.bigView = false;
+            else { GoBack(); return; }
+        }
     }
     if (ms.solutionConfirmAt > 0 && GetTime() - ms.solutionConfirmAt > 3.0) ms.solutionConfirmAt = 0;
+    if (lv) PlaybackUpdate(GetFrameTime());
 
     // top bar
     const char *lang = (t.lang == LANG_CPP) ? "C++" : "C";
@@ -873,6 +1113,22 @@ void ScreenMission(void)
     // While a card is showing on top, everything underneath still draws but ignores the mouse
     UiSetBlocked(overlay);
     if (BackButton("< Back")) { UiSetBlocked(false); GoBack(); return; }
+
+    if (lv) {
+        // a 3D level: brief and editor on the left, the scene and the output on the right
+        float colW = SCREEN_W * 0.41f;
+        if (colW < 470) colW = 470;
+        if (colW > 760) colW = 760;
+        Rectangle col = { 20, 84, colW, SCREEN_H - 104.0f };
+        Rectangle right = { col.x + colW + 16, 84, SCREEN_W - (col.x + colW + 16) - 20, SCREEN_H - 104.0f };
+        if (ms.bigView) right = (Rectangle){ 20, 84, SCREEN_W - 40.0f, SCREEN_H - 104.0f };
+        else DrawLevelLeft(col, &t, lv, overlay);
+        DrawLevelRight(right, &t);
+        UiSetBlocked(false);
+        if (t.mode == MODE_BUGS && !ms.inContract && ms.timeUp && !ms.squashed) DrawTimeUp();
+        DrawCelebration(&t);
+        return;
+    }
 
     float leftW = SCREEN_W >= 1600 ? 460 : 380;
     Rectangle left = { 20, 84, leftW, SCREEN_H - 104.0f };

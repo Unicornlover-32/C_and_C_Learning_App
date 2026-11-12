@@ -30,8 +30,10 @@ int         PlayerLevel(int xp);           // 1, 2, 3...
 int         LevelXp(int level);            // XP needed to reach that level
 const char *PlayerTitle(int level);
 
-int  TotalStars(void);                     // stars from missions and Output Rushes
+int  TotalStars(void);                     // stars from levels, bosses, bonus rounds and Output Rushes
 int  MaxStars(void);
+int  SideStars(void);                      // stars from the optional side quests, counted on their own
+int  MaxSideStars(void);
 bool MissionCleared(int mission);
 bool LevelCleared(int tut);                // its main mission is cleared
 

@@ -2072,6 +2072,264 @@ static const Mission MISSIONS[] = {
 },
 
 // =====================================================================
+// Bug hunts for the rest of the levels: two bugs each in the project's own solution
+#define BUG_HOWTO "\n\nClick a bug to jump to its line, fix the code, then Run & Check - when every test passes, all the bugs are squashed. Beat the clock, and fix them all on your first run for the third star."
+{
+    .id = "bugs-receipt", .level = "c-variables-const", .region = 0,
+    .role = ROLE_BONUS, .mode = MODE_BUGS, .lang = LANG_C,
+    .title = "Price Check",
+    .brief = "The receipt's subtotal is nonsense and the tax has lost a decimal place." BUG_HOWTO,
+    .hint = "What does + do that * doesn't? And how many decimal places does money need?",
+    .timeLimit = 150,
+    .bugCount = 2,
+    .bugs = {
+        { "    double subtotal = quantity * price;", "    double subtotal = quantity + price;",
+          "Three items at 19.99 cost quantity * price - adding them gives 22.99." },
+        { "    printf(\"Tax: %.2f\\n\", tax);", "    printf(\"Tax: %.1f\\n\", tax);",
+          "Money is printed with two decimal places: %.2f." },
+    },
+},
+
+// =====================================================================
+{
+    .id = "bugs-time", .level = "c-input-maths", .region = 0,
+    .role = ROLE_BONUS, .mode = MODE_BUGS, .lang = LANG_C,
+    .title = "Lost Minutes",
+    .brief = "The minutes are far too big, and the decimal minutes always end in .00." BUG_HOWTO,
+    .hint = "Minutes are what's left over after the hours. And when does the cast happen - before or after the division?",
+    .timeLimit = 150,
+    .bugCount = 2,
+    .bugs = {
+        { "    int minutes = (total % 3600) / 60;", "    int minutes = total / 60;",
+          "total / 60 counts the minutes in the hours too: take what's left after the hours with % 3600 first." },
+        { "    printf(\"In minutes: %.2f\\n\", (double)total / 60);", "    printf(\"In minutes: %.2f\\n\", (double)(total / 60));",
+          "(double)(total / 60) divides two ints first and throws the decimals away - cast total, then divide." },
+    },
+},
+
+// =====================================================================
+{
+    .id = "bugs-toolkit", .level = "c-functions-arrays", .region = 0,
+    .role = ROLE_BONUS, .mode = MODE_BUGS, .lang = LANG_C,
+    .title = "Copy Machine",
+    .brief = "doubleAll() doesn't double anything, and the average has lost its decimals." BUG_HOWTO,
+    .hint = "Where does doubleAll put its result? And what does int / int give you?",
+    .timeLimit = 150,
+    .bugCount = 2,
+    .bugs = {
+        { "        arr[i] = arr[i] * 2;", "        int doubled = arr[i] * 2;",
+          "The array is changed in place: store the result back into arr[i]. A local variable is thrown away." },
+        { "    return (double)sum / size;", "    return sum / size;",
+          "sum / size with two ints drops the decimals - make one of them a double first." },
+    },
+},
+
+// =====================================================================
+{
+    .id = "bugs-walk", .level = "c-pointer-arith", .region = 0,
+    .role = ROLE_BONUS, .mode = MODE_BUGS, .lang = LANG_C,
+    .title = "Stuck Pointer",
+    .brief = "The backward walk starts in the wrong place, and the sum keeps adding the same number." BUG_HOWTO,
+    .hint = "Where is the last number - numbers + count, or one before it? And does the pointer in sum() ever move?",
+    .timeLimit = 180,
+    .bugCount = 2,
+    .bugs = {
+        { "    for (int *p = numbers + count - 1; p >= numbers; p--) {", "    for (int *p = numbers + count; p > numbers; p--) {",
+          "The last number is at numbers + count - 1, and the walk has to include numbers itself, so it needs >=." },
+        { "        ptr++;", "        (void)ptr;",
+          "Without ptr++ the pointer never moves, so every pass adds the first number again." },
+    },
+},
+
+// =====================================================================
+{
+    .id = "bugs-calc", .level = "c-scope-funcptr", .region = 0,
+    .role = ROLE_BONUS, .mode = MODE_BUGS, .lang = LANG_C,
+    .title = "Crossed Wires",
+    .brief = "Subtracting adds, and dividing by zero isn't caught." BUG_HOWTO,
+    .hint = "Which function should '-' point at? And which number is the one you divide BY?",
+    .timeLimit = 150,
+    .bugCount = 2,
+    .bugs = {
+        { "            case '-': operation = subtract; break;", "            case '-': operation = add; break;",
+          "'-' has to point operation at subtract." },
+        { "        } else if (op == '/' && b == 0) {", "        } else if (op == '/' && a == 0) {",
+          "Dividing BY zero is the problem: check b, the number on the right." },
+    },
+},
+
+// =====================================================================
+{
+    .id = "bugs-roster", .level = "c-structs", .region = 0,
+    .role = ROLE_BONUS, .mode = MODE_BUGS, .lang = LANG_C,
+    .title = "Ties and Fractions",
+    .brief = "A tie gives the top spot to the wrong student, and the average has lost its decimal." BUG_HOWTO,
+    .hint = "Should a later student with the same score take over? And when does the cast to float happen?",
+    .timeLimit = 150,
+    .bugCount = 2,
+    .bugs = {
+        { "        if (students[i].score > students[best].score) {", "        if (students[i].score >= students[best].score) {",
+          "With >= a later tie takes the top spot. Only a strictly higher score (>) should." },
+        { "    printf(\"Average: %.1f\\n\", total / (float)n);", "    printf(\"Average: %.1f\\n\", (float)(total / n));",
+          "(float)(total / n) divides two ints first and loses the decimal - cast before dividing." },
+    },
+},
+
+// =====================================================================
+{
+    .id = "bugs-rect", .level = "cpp-hello", .region = 2,
+    .role = ROLE_BONUS, .mode = MODE_BUGS, .lang = LANG_CPP,
+    .title = "Fence Trouble",
+    .brief = "The area is far too small and the perimeter forgot a side." BUG_HOWTO,
+    .hint = "Area multiplies. And what do the brackets in 2 * (width + height) do?",
+    .timeLimit = 120,
+    .bugCount = 2,
+    .bugs = {
+        { "    cout << \"Area: \" << width * height << \"\\n\";", "    cout << \"Area: \" << width + height << \"\\n\";",
+          "The area is width * height - adding gives half the perimeter." },
+        { "    cout << \"Perimeter: \" << 2 * (width + height) << \"\\n\";", "    cout << \"Perimeter: \" << 2 * width + height << \"\\n\";",
+          "Without the brackets only the width is doubled: 2 * (width + height)." },
+    },
+},
+
+// =====================================================================
+{
+    .id = "bugs-refs", .level = "cpp-references", .region = 2,
+    .role = ROLE_BONUS, .mode = MODE_BUGS, .lang = LANG_CPP,
+    .title = "Copies Everywhere",
+    .brief = "The largest value goes in the wrong variable, and the swap swaps nothing." BUG_HOWTO,
+    .hint = "Which reference should the bigger value go into? And what does swap change without the &?",
+    .timeLimit = 150,
+    .bugCount = 2,
+    .bugs = {
+        { "        if (arr[i] > largest) largest = arr[i];", "        if (arr[i] > largest) smallest = arr[i];",
+          "A bigger value belongs in largest - writing it to smallest overwrites the minimum." },
+        { "void swap(int &a, int &b)", "void swap(int a, int b)",
+          "Without & the function gets copies and swaps those - the array never changes." },
+    },
+},
+
+// =====================================================================
+{
+    .id = "bugs-grid", .level = "cpp-new-delete", .region = 2,
+    .role = ROLE_BONUS, .mode = MODE_BUGS, .lang = LANG_CPP,
+    .title = "Grid Glitch",
+    .brief = "The grid starts counting at 2, and the total is just the last cell." BUG_HOWTO,
+    .hint = "When does ++counter add 1 compared with counter++? And does total add up or get replaced?",
+    .timeLimit = 150,
+    .bugCount = 2,
+    .bugs = {
+        { "            arr2D[row][col] = counter++;", "            arr2D[row][col] = ++counter;",
+          "++counter adds 1 before using the value, so the grid starts at 2. counter++ uses it first." },
+        { "            total += arr2D[row][col];", "            total = arr2D[row][col];",
+          "= replaces the total each time; += adds to it." },
+    },
+},
+
+// =====================================================================
+{
+    .id = "bugs-points", .level = "cpp-objects", .region = 2,
+    .role = ROLE_BONUS, .mode = MODE_BUGS, .lang = LANG_CPP,
+    .title = "Lost in Space",
+    .brief = "The points drift the wrong way up and down, and print() has an extra space." BUG_HOWTO,
+    .hint = "Which offset belongs to y? And look closely at what print() writes between the numbers.",
+    .timeLimit = 150,
+    .bugCount = 2,
+    .bugs = {
+        { "        y += offsetY;", "        y += offsetX;",
+          "y moves by offsetY - offsetX is for x." },
+        { "        cout << \"(\" << x << \",\" << y << \")\";", "        cout << \"(\" << x << \", \" << y << \")\";",
+          "The point is printed as (x,y) with no space after the comma." },
+    },
+},
+
+// =====================================================================
+{
+    .id = "bugs-boxes", .level = "cpp-overloading", .region = 2,
+    .role = ROLE_BONUS, .mode = MODE_BUGS, .lang = LANG_CPP,
+    .title = "Operator Mix-up",
+    .brief = "The volumes are wrong, and adding two boxes multiplies their heights." BUG_HOWTO,
+    .hint = "Volume multiplies all three sides. operator+ adds side to side.",
+    .timeLimit = 150,
+    .bugCount = 2,
+    .bugs = {
+        { "        return length * breadth * height;", "        return length * breadth + height;",
+          "The volume multiplies all three sides." },
+        { "        box.height = this->height + b.height;", "        box.height = this->height * b.height;",
+          "operator+ adds each side, including the height." },
+    },
+},
+
+// =====================================================================
+{
+    .id = "bugs-templates", .level = "cpp-templates", .region = 3,
+    .role = ROLE_BONUS, .mode = MODE_BUGS, .lang = LANG_CPP,
+    .title = "Mould Damage",
+    .brief = "biggest() finds the smallest, and the Adder only remembers the last thing added." BUG_HOWTO,
+    .hint = "Which comparison keeps the bigger item? And does add() add, or replace?",
+    .timeLimit = 150,
+    .bugCount = 2,
+    .bugs = {
+        { "        if (items[i] > best) {", "        if (items[i] < best) {",
+          "biggest keeps the larger item, so it needs >." },
+        { "    void add(T number) { m_sum += number; }", "    void add(T number) { m_sum = number; }",
+          "= keeps only the last one; += adds them all up (and joins strings)." },
+    },
+},
+
+// =====================================================================
+{
+    .id = "bugs-train", .level = "cpp-strings-vectors", .region = 3,
+    .role = ROLE_BONUS, .mode = MODE_BUGS, .lang = LANG_CPP,
+    .title = "Off the Rails",
+    .brief = "The list is numbered from 0, and a tie for longest goes to the wrong word." BUG_HOWTO,
+    .hint = "People count from 1. And should a word of the same length replace the longest?",
+    .timeLimit = 150,
+    .bugCount = 2,
+    .bugs = {
+        { "        cout << i + 1 << \". \" << list[i] << \"\\n\";", "        cout << i << \". \" << list[i] << \"\\n\";",
+          "Vector positions start at 0, but the list is numbered from 1: print i + 1." },
+        { "        if (list[i].size() > longest.size()) {", "        if (list[i].size() >= longest.size()) {",
+          "With >= a later word of the same length wins - the first one should stay." },
+    },
+},
+
+// =====================================================================
+{
+    .id = "bugs-queue", .level = "cpp-lists", .region = 3,
+    .role = ROLE_BONUS, .mode = MODE_BUGS, .lang = LANG_CPP,
+    .title = "Wrong End",
+    .brief = "VIPs end up at the back, and the desk serves the wrong person." BUG_HOWTO,
+    .hint = "Which end of the list does a vip join? And which end does serve take from?",
+    .timeLimit = 150,
+    .bugCount = 2,
+    .bugs = {
+        { "            line.push_front(name);", "            line.push_back(name);",
+          "A vip goes to the front of the line: push_front." },
+        { "                cout << \"Serving \" << line.front() << \"\\n\";", "                cout << \"Serving \" << line.back() << \"\\n\";",
+          "The desk serves the front of the line: front()." },
+    },
+},
+
+// =====================================================================
+{
+    .id = "bugs-digits", .level = "cpp-maps", .region = 3,
+    .role = ROLE_BONUS, .mode = MODE_BUGS, .lang = LANG_CPP,
+    .title = "Miscount",
+    .brief = "Every digit counts as 0, and half the digits are skipped." BUG_HOWTO,
+    .hint = "Does the count ever go up? And how many digits does / 100 drop at once?",
+    .timeLimit = 150,
+    .bugCount = 2,
+    .bugs = {
+        { "        freq[numbers[j]] = ++frequency;", "        freq[numbers[j]] = frequency;",
+          "The count has to go up by one each time: ++frequency." },
+        { "        number = number / 10;", "        number = number / 100;",
+          "/ 10 drops exactly one digit; / 100 skips every other one." },
+    },
+},
+#undef BUG_HOWTO
+
+// =====================================================================
 {
     .id = "factory-mega", .level = NULL, .region = 3,
     .role = ROLE_BOSS, .mode = MODE_FACTORY, .lang = LANG_CPP,

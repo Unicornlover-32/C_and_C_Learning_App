@@ -249,12 +249,15 @@ static void DrawNode(int i, bool isNext)
     } else {
         Color num = cleared ? (Color){ 90, 60, 10, 255 } : (Color){ 40, 44, 60, 255 };
         UiTextCentered(TextFormat("%d", n->tut + 1), c.x, c.y - S(13), fmaxf(14, S(26)), num);
-        // which game this level plays
-        int main = MainMissionOf(n->tut);
-        if (main >= 0) {
+        // every level is its own 3D game; the badge shows an optional side quest, if it has one
+        int list[8], count = LevelMissions(n->tut, list);
+        for (int i = 0; i < count; i++) {
+            const MissionInfo *side = GetMission(list[i]);
+            if (side->role != ROLE_SIDE) continue;
             Vector2 badge = { c.x + r * 0.8f, c.y - r * 0.8f };
             DrawCircleV(badge, S(13), (Color){ 30, 32, 42, 255 });
-            DrawModeIcon(GetMission(main)->mode, badge, S(20));
+            DrawModeIcon(side->mode, badge, S(20));
+            break;
         }
     }
     DrawStarRow(c.x, c.y + r + S(boss ? 26 : 12), fmaxf(4, S(7)), NodeStars(n), -1);
@@ -393,12 +396,14 @@ void ScreenMap(void)
 
     // legend
     float lx = 16, ly = SCREEN_H - 40.0f;
-    DrawRectangleRounded((Rectangle){ lx - 6, ly - 8, 640, 38 }, 0.4f, 6, (Color){ 22, 24, 31, 200 });
-    GameMode modes[4] = { MODE_ROBOT, MODE_HEIST, MODE_FACTORY, MODE_BUGS };
-    for (int i = 0; i < 4; i++) {
-        float x = lx + 8 + i * 158;
+    DrawRectangleRounded((Rectangle){ lx - 6, ly - 8, 600, 38 }, 0.4f, 6, (Color){ 22, 24, 31, 200 });
+    UiText("Every level is a 3D game.  Badges: side quests -", lx + 4, ly + 2, 16, COL_MUTED);
+    GameMode modes[2] = { MODE_ROBOT, MODE_HEIST };
+    float x = lx + 8 + UiTextWidth("Every level is a 3D game.  Badges: side quests -", 16);
+    for (int i = 0; i < 2; i++) {
         DrawModeIcon(modes[i], (Vector2){ x + 10, ly + 11 }, 22);
-        UiText(ModeName(modes[i]), x + 26, ly + 2, 17, COL_TEXT);
+        UiText(ModeName(modes[i]), x + 26, ly + 2, 16, COL_TEXT);
+        x += 36 + UiTextWidth(ModeName(modes[i]), 16);
     }
 
     DrawTopBar("World Map");

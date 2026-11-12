@@ -54,12 +54,30 @@ bool LevelCleared(int tut) { return MissionCleared(MainMissionOf(tut)); }
 int TotalStars(void)
 {
     int n = 0;
-    for (int i = 0; i < MissionCount() && i < MAX_MISSIONS; i++) n += StarCount(prog.stars[i]);
+    for (int i = 0; i < MissionCount() && i < MAX_MISSIONS; i++)
+        if (GetMission(i)->role != ROLE_SIDE) n += StarCount(prog.stars[i]);
     for (int t = 0; t < TutorialCount() && t < MAX_TUTORIALS; t++) n += prog.rushStars[t];
     return n;
 }
 
-int MaxStars(void) { return 3 * (MissionCount() + TutorialCount()); }
+int SideStars(void)
+{
+    int n = 0;
+    for (int i = 0; i < MissionCount() && i < MAX_MISSIONS; i++)
+        if (GetMission(i)->role == ROLE_SIDE) n += StarCount(prog.stars[i]);
+    return n;
+}
+
+static int SideCount(void)
+{
+    int n = 0;
+    for (int i = 0; i < MissionCount(); i++) if (GetMission(i)->role == ROLE_SIDE) n++;
+    return n;
+}
+
+int MaxSideStars(void) { return 3 * SideCount(); }
+
+int MaxStars(void) { return 3 * (MissionCount() - SideCount() + TutorialCount()); }
 
 static int Today(void)
 {

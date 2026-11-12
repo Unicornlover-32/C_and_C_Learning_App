@@ -175,7 +175,10 @@ void MissionsInit(void)
         }
         info->id = m->id;
         info->mode = m->mode;
+        // Each level's own project is its main mission now: the robot and heist games
+        // become optional side quests, and every bug hunt is a bonus round
         info->role = m->role;
+        if (m->role == ROLE_MAIN) info->role = (m->mode == MODE_ROBOT || m->mode == MODE_HEIST) ? ROLE_SIDE : ROLE_BONUS;
         info->lang = m->lang;
         info->tut = (m->role == ROLE_BOSS) ? -1 : tut;
         info->region = (m->role == ROLE_BOSS) ? m->region : RegionOf(tut);
@@ -205,18 +208,14 @@ void MissionsInit(void)
         missionCount++;
     }
 
-    // Each level's own project, as a Code Factory mission
+    // Each level's own project: its main mission (a 3D level where there is one)
     for (int t = 0; t < TutorialCount() && missionCount < MAX_MISSIONS; t++) {
         const Tutorial *tu = GetTutorial(t);
-        bool hasMain = false;
-        for (int i = 0; i < missionCount; i++)
-            if (missions[i].tut == t && missions[i].role == ROLE_MAIN) hasMain = true;
-
         MissionInfo *info = &missions[missionCount++];
         memset(info, 0, sizeof(*info));
         info->id = tu->id;
         info->mode = MODE_FACTORY;
-        info->role = hasMain ? ROLE_BONUS : ROLE_MAIN;
+        info->role = ROLE_MAIN;
         info->lang = tu->lang;
         info->tut = t;
         info->region = RegionOf(t);
@@ -252,18 +251,16 @@ int MainMissionOf(int tut)
     return -1;
 }
 
-// Main first, then the level's own project (if it isn't the main), then bug hunts
+// The level's own project first, then its side quests, then its bonus rounds
 int LevelMissions(int tut, int *out)
 {
     int n = 0;
     int main = MainMissionOf(tut);
     if (main >= 0) out[n++] = main;
     for (int pass = 0; pass < 2; pass++) {
-        for (int i = 0; i < missionCount; i++) {
-            if (missions[i].tut != tut || i == main) continue;
-            bool factory = missions[i].mode == MODE_FACTORY;
-            if ((pass == 0) == factory) out[n++] = i;
-        }
+        MissionRole want = pass == 0 ? ROLE_SIDE : ROLE_BONUS;
+        for (int i = 0; i < missionCount && n < 8; i++)
+            if (missions[i].tut == tut && i != main && missions[i].role == want) out[n++] = i;
     }
     return n;
 }

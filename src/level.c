@@ -1,6 +1,7 @@
 // A level is one tutorial: the Briefing (the lesson pages), the Output Rush (its quiz)
 // and its missions - the main game first, then the extras.
 #include "app.h"
+#include "game/levels.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -122,9 +123,17 @@ void ScreenLevel(void)
         const MissionInfo *m = GetMission(missions[i]);
         r = (Rectangle){ x, y, w, cardH };
         bool locked = !RushCleared(tut);
-        const char *title = TextFormat("%s%s: %s", i == 0 ? "" : "Extra - ", ModeName(m->mode), m->title);
+        // the level's own project plays as its 3D level when it has one
+        const LevelDef *lv = (m->role == ROLE_MAIN) ? LevelFor(t->id) : NULL;
+        const char *kind = m->role == ROLE_SIDE ? "Side quest - " : m->role == ROLE_BONUS ? "Bonus - " : "";
+        char title[160], blurb[220];       // (TextFormat's few buffers could be reused inside StageCard)
+        if (lv) snprintf(title, sizeof(title), "%s: %s", lv->name, m->title);
+        else snprintf(title, sizeof(title), "%s%s: %s", kind, ModeName(m->mode), m->title);
+        if (m->role == ROLE_SIDE) snprintf(blurb, sizeof(blurb), "Optional. %s Its stars count towards your side quest total.", ModeBlurb(m->mode));
+        else snprintf(blurb, sizeof(blurb), "%s", lv ? lv->tagline : ModeBlurb(m->mode));
+        Color color = lv ? lv->color : ModeColor(m->mode);
         bool done = MissionCleared(missions[i]);
-        if (StageCard(r, index++, NULL, m->mode, true, ModeColor(m->mode), title, ModeBlurb(m->mode), -1, prog.stars[missions[i]], true,
+        if (StageCard(r, index++, NULL, m->mode, true, color, title, blurb, -1, prog.stars[missions[i]], true,
                       done ? "Play again" : "Play >", locked, "Clear the Output Rush to unlock this mission.", done)) {
             OpenMission(missions[i]);
             return;
