@@ -29,6 +29,27 @@ const LevelDef *LevelFor(const char *tutId);     // NULL if that project has no 
 extern const LevelDef LEVEL_FACTORY;             // Factory Contracts and the factory boss: any program's output
 extern const LevelDef LEVEL_ROBOT;               // Robot Rescue side quests and bosses: the robot library's trace
 extern const LevelDef LEVEL_HEIST;               // Memory Heist side quests and the boss: the heist library's trace
+extern const LevelDef LEVEL_CHESS;               // Chess Puzzles: the chess library's moves
+
+// ---------------------------------------------------------------- chess looks (level_chess.c)
+// Piece sets and boards, each unlocked once the player has enough stars (AllStars)
+#define CHESS_PIECE_SETS 5
+#define CHESS_BOARDS     6
+const char *ChessPieceSetName(int i);
+int         ChessPieceSetStars(int i);
+const char *ChessBoardName(int i);
+int         ChessBoardStars(int i);
+void        ChessSetStyle(int pieceSet, int board);
+void        ChessPreview(Rectangle view, float time, float dt);   // the starting position in the chosen look
+const char *ChessDifficultyName(int d);          // "EASY" ... "VERY HARD"
+Color       ChessDifficultyColor(int d);
+// The 1v1 game's board: a position, then each move as it is played (flags as in the trace)
+void        ChessSceneStart(const char *squares64, float yaw);    // yaw 0: White at the bottom, 180: Black
+void        ChessSceneTurn(float yaw);                            // swing the camera round
+void        ChessSceneMove(int from, int to, char promo, const char *flags, bool white);
+void        ChessSceneRefused(int from, int to);                  // a move the rules refused (-1: no square)
+bool        ChessSceneBusy(void);                                 // a piece is still moving
+void        ChessSceneDraw(Rectangle view, float dt);
 int             LevelTableCount(void);
 const LevelDef *LevelTableAt(int i);
 

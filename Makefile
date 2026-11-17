@@ -15,7 +15,7 @@ LDFLAGS =
 
 # The test program needs the runner, the tutorials and the levels, but no screens
 TEST     = test_levels
-TEST_SRC = tests/test_levels.c src/runner.c src/tutorials.c src/tutorials_c.c src/tutorials_cpp.c src/missions.c src/missions_data.c src/projects.c \
+TEST_SRC = tests/test_levels.c src/runner.c src/tutorials.c src/tutorials_c.c src/tutorials_cpp.c src/missions.c src/missions_data.c src/chess_puzzles.c src/projects.c \
            src/ui.c src/highlight.c $(wildcard src/game/*.c)
 
 # The debug build gets its own file, so switching between the two never reuses a stale one

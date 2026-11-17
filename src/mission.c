@@ -1,16 +1,11 @@
-// The mission screen: the task on the left, the code editor, and the game on the right.
-//   3D levels    - a level's own project: the brief and the editor on the left, and the
-//                  level's 3D scene on the right, played from the program's real output
-//                  for each test, with the expected and actual output underneath
-//   Code Factory - each test is a crate on a conveyor belt; wrong output falls off the belt
-//   Robot Rescue - the maze, and a replay of what the robot did
-//   Memory Heist - the street of memory, and a replay of what the thief did
-//   Bug Hunter   - Code Factory, plus bugs sitting on the broken lines and a clock
-// Factory Contracts (the bigger, multi-step projects) use this screen too.
+// The mission screen: the brief and the code editor on the left, and the mission's 3D
+// level on the right, played from the program's real output (and, for the games, the
+// game library's trace) for each test, with the expected and actual output underneath.
+// Every mission plays as a 3D level: a tutorial's own project and its Bug Hunter round,
+// the Factory Contracts (the bigger, multi-step projects), the bosses, the Robot Rescue
+// and Memory Heist side quests, and the chess puzzles.
 #include "app.h"
 #include "editor.h"
-#include "robotview.h"
-#include "heistview.h"
 #include "game/levels.h"
 #include <math.h>
 #include <stdio.h>
@@ -50,10 +45,6 @@ static struct {
     bool   fresh, usedHelp;
     int    runs;
 
-    int    sel;                  // the test shown in the game view
-    int    speed;                // replay speed: 0, 1 or 2
-    double beltStart;            // when the conveyor started moving
-    int    crate;                // the crate whose details are shown, -1 = first failure
 
     // Bug Hunter
     double startTime;
@@ -93,7 +84,7 @@ static Task CurTask(void)
                    m->tests, m->testCount, m->parLines, m->timeLimit };
 }
 
-static bool IsGame(GameMode mode) { return mode == MODE_ROBOT || mode == MODE_HEIST; }
+static bool IsGame(GameMode mode) { return mode == MODE_ROBOT || mode == MODE_HEIST || mode == MODE_CHESS; }
 
 // The 3D level this mission plays as: a level's own project, and its Bug Hunter round
 // (same tests, same output), play that level; every other program (the Factory Contracts,
@@ -110,6 +101,7 @@ static const LevelDef *CurLevel(void)
     if (m->mode == MODE_FACTORY || m->mode == MODE_BUGS) return &LEVEL_FACTORY;
     if (m->mode == MODE_ROBOT) return &LEVEL_ROBOT;
     if (m->mode == MODE_HEIST) return &LEVEL_HEIST;
+    if (m->mode == MODE_CHESS) return &LEVEL_CHESS;
     return NULL;
 }
 
@@ -138,8 +130,6 @@ static void ResetPanel(void)
     ms.briefScroll = 0;
     ms.logScroll = 0;
     ms.notice[0] = '\0';
-    ms.sel = 0;
-    ms.crate = -1;
     ms.celebrate = false;
     ms.burst = false;
     ms.timeUp = false;
@@ -149,8 +139,7 @@ static void ResetPanel(void)
     ms.startTime = GetTime();
     for (int i = 0; i < MAX_BUGS; i++) ms.bugAt[i] = -1;
     Task t = CurTask();
-    if (t.mode == MODE_ROBOT) RobotLoad(t.tests, t.testCount);
-    if (t.mode == MODE_HEIST) HeistLoad(t.tests, t.testCount);
+    if (t.mode == MODE_CHESS) ChessSetStyle(prog.chessPieces, prog.chessBoard);
     PlaybackOpen(CurLevel(), t.tests, t.testCount);
     if (!ms.inContract && t.mode == MODE_BUGS)
         for (int i = 0; i < Cur()->bugCount; i++) ms.bugAt[i] = Cur()->bugs[i].bugLine;
@@ -200,6 +189,7 @@ static void GoBack(void)
 {
     SaveDraft();
     if (ms.inContract) OpenContract(ms.proj);
+    else if (Cur()->role == ROLE_CHESS) OpenChess();
     else if (Cur()->role == ROLE_BOSS) OpenMap();
     else OpenLevel(Cur()->tut);
 }
@@ -213,21 +203,6 @@ static void GoToStep(int step)
 }
 
 // ---------------------------------------------------------------- running
-
-static int FirstFailure(void)
-{
-    for (int i = 0; i < result.testCount; i++) if (!result.passed[i]) return i;
-    return -1;
-}
-
-static void ShowTest(int test)
-{
-    Task t = CurTask();
-    ms.sel = test;
-    if (!ms.hasResult || !result.compiled || CurLevel()) return;    // a 3D level plays every test itself
-    if (t.mode == MODE_ROBOT) RobotPlay(test, result.events[test], result.won[test]);
-    if (t.mode == MODE_HEIST) HeistPlay(test, result.events[test], result.won[test], result.status[test] == RUN_CRASHED);
-}
 
 static unsigned char StarsForThisRun(const Task *t)
 {
@@ -273,12 +248,8 @@ static void DoRun(void)
     ms.runPending = false;
     ms.runs++;
     ms.logScroll = 0;
-    ms.crate = -1;
-    ms.beltStart = GetTime();
     editor.focused = true;
 
-    int fail = FirstFailure();
-    ShowTest(fail >= 0 ? fail : 0);
     if (CurLevel()) {
         if (result.compiled) PlaybackRun(&result);
         else PlaybackCompileFailed();
@@ -286,27 +257,7 @@ static void DoRun(void)
     if (result.allPassed) OnSuccess(&t);
 }
 
-// ---------------------------------------------------------------- Code Factory: the conveyor belt
-
-static void DrawCrate(Vector2 c, float s, int number, int stamp, float angle)
-{
-    Rectangle r = { c.x, c.y, s, s };
-    Color wood = { 176, 128, 76, 255 };
-    DrawRectanglePro(r, (Vector2){ s / 2, s / 2 }, angle, wood);
-    if (fabsf(angle) < 0.5f) {
-        Rectangle b = { c.x - s / 2, c.y - s / 2, s, s };
-        DrawRectangleLinesEx(b, 2, (Color){ 120, 82, 45, 255 });
-        DrawLineEx((Vector2){ b.x + 4, b.y + 4 }, (Vector2){ b.x + s - 4, b.y + s - 4 }, 2, (Color){ 140, 98, 55, 255 });
-        UiTextCentered(TextFormat("#%d", number), c.x, c.y - 9, 17, (Color){ 60, 38, 15, 255 });
-        if (stamp == 1) {
-            DrawCircleV((Vector2){ c.x + s * 0.32f, c.y - s * 0.32f }, s * 0.2f, (Color){ 40, 160, 90, 255 });
-            UiTextCentered("OK", c.x + s * 0.32f, c.y - s * 0.32f - 8, 14, WHITE);
-        } else if (stamp == 2) {
-            DrawCircleV((Vector2){ c.x + s * 0.32f, c.y - s * 0.32f }, s * 0.2f, (Color){ 190, 50, 55, 255 });
-            UiTextCentered("X", c.x + s * 0.32f, c.y - s * 0.32f - 8, 15, WHITE);
-        }
-    }
-}
+// ---------------------------------------------------------------- output boxes
 
 static void DrawOutputBox(const char *label, const char *text, Rectangle r, Color labelColor)
 {
@@ -331,247 +282,6 @@ static float DrawCompileLog(Rectangle area, const char *intro)
     float maxScroll = h - log.height + 16;
     if (ms.logScroll > maxScroll) ms.logScroll = maxScroll > 0 ? maxScroll : 0;
     return h;
-}
-
-static void DrawFactory(Rectangle r, const Task *t)
-{
-    DrawRectangleRounded(r, 0.04f, 8, COL_PANEL);
-    float time = (float)GetTime();
-    int n = t->testCount;
-    float x0 = r.x + 18, w = r.width - 36;
-
-    // --- the factory floor (squeezed a little on short screens, so the output boxes stay readable)
-    bool compact = r.height < 380;
-    float beltY = r.y + (compact ? 60 : 78), beltH = 22;
-    float crateS = compact ? 38 : 44;
-    Rectangle machine = { r.x + r.width * 0.5f - 80, r.y + 12, 160, compact ? 86.0f : 104.0f };
-    bool busy = ms.runPending;
-    float spin = busy ? time * 6 : (ms.hasResult ? 0 : time * 0.6f);
-
-    DrawRectangle((int)x0, (int)(beltY + beltH), (int)w, 6, (Color){ 30, 32, 40, 255 });
-    DrawRectangleRounded((Rectangle){ x0, beltY, w, beltH }, 0.5f, 6, (Color){ 58, 60, 72, 255 });
-    float offset = fmodf(time * (busy ? 120 : 30), 24);
-    BeginScissorMode((int)x0, (int)beltY, (int)w, (int)beltH);
-    for (float sx = x0 - 24 + offset; sx < x0 + w; sx += 24)
-        DrawLineEx((Vector2){ sx, beltY + 3 }, (Vector2){ sx + 10, beltY + beltH - 3 }, 3, (Color){ 80, 84, 98, 255 });
-    EndScissorMode();
-
-    // reject bin and shipping bay
-    Rectangle bin = { r.x + r.width * 0.5f + 96, beltY + beltH + 10, 230, compact ? 36.0f : 44.0f };
-    DrawRectangleRounded(bin, 0.2f, 6, (Color){ 90, 40, 44, 255 });
-    UiText("REJECTS", bin.x + bin.width + 8, bin.y + bin.height / 2 - 8, 14, (Color){ 255, 170, 170, 255 });
-    Rectangle bay = { r.x + r.width - 18 - 150, r.y + 14, 150, beltY - r.y - 18 };
-    DrawRectangleRounded(bay, 0.15f, 6, (Color){ 36, 70, 52, 255 });
-    UiTextCentered("SHIPPED", bay.x + bay.width / 2, bay.y + 4, 14, (Color){ 170, 255, 200, 255 });
-
-    // the machine is the student's program
-    DrawRectangleRounded(machine, 0.15f, 8, (Color){ 70, 76, 100, 255 });
-    DrawRectangleRounded((Rectangle){ machine.x + 8, machine.y + 8, machine.width - 16, 28 }, 0.3f, 6, (Color){ 40, 44, 60, 255 });
-    UiTextCentered("YOUR PROGRAM", machine.x + machine.width / 2, machine.y + 13, 15, COL_FACTORY);
-    IconGear((Vector2){ machine.x + machine.width / 2 - 26, machine.y + 68 }, 38, spin, COL_FACTORY);
-    IconGear((Vector2){ machine.x + machine.width / 2 + 22, machine.y + 74 }, 26, -spin * 1.4f, (Color){ 200, 140, 60, 255 });
-    if (ms.hasResult && !result.compiled) {
-        UiTextCentered("JAMMED", machine.x + machine.width / 2, machine.y + machine.height + 4, 18, COL_BAD);
-        for (int i = 0; i < 3; i++)
-            DrawCircleV((Vector2){ machine.x + 30 + i * 50, machine.y - 6 - fmodf(time * 20 + i * 9, 20) }, 8, (Color){ 140, 140, 150, 120 });
-    }
-
-    // crates: waiting on the left, then through the machine
-    float inX = machine.x - 30, outX = machine.x + machine.width + 30;
-    for (int i = 0; i < n; i++) {
-        float queueX = x0 + 30 + i * (crateS + 8);
-        Vector2 pos = { queueX, beltY - crateS / 2 + 2 };
-        int stamp = 0;
-        float angle = 0;
-        bool shown = true;
-        if (ms.hasResult && result.compiled) {
-            float t = (float)(GetTime() - ms.beltStart) - i * 0.45f;
-            bool pass = result.passed[i];
-            if (t < 0) {
-                pos.x = queueX;
-            } else if (t < 0.5f) {
-                pos.x = queueX + (inX - queueX) * (t / 0.5f);
-            } else if (t < 0.8f) {
-                shown = false;                                   // inside the machine
-            } else if (t < 1.3f) {
-                stamp = pass ? 1 : 2;
-                pos.x = outX + (t - 0.8f) / 0.5f * 60;
-            } else {
-                stamp = pass ? 1 : 2;
-                float k = fminf(1, (t - 1.3f) / 0.5f);
-                if (pass) {
-                    int slot = 0;
-                    for (int j = 0; j < i; j++) if (result.passed[j]) slot++;
-                    Vector2 dest = { bay.x + 28 + (slot % 3) * 48, bay.y + 42 + (slot / 3) * 46 };
-                    pos.x = outX + 60 + (dest.x - outX - 60) * k;
-                    pos.y = pos.y + (dest.y - pos.y) * k;
-                } else {
-                    int slot = 0;
-                    for (int j = 0; j < i; j++) if (!result.passed[j]) slot++;
-                    Vector2 dest = { bin.x + 26 + slot * 44, bin.y + bin.height / 2 };
-                    pos.x = outX + 60 + (dest.x - outX - 60) * k;
-                    pos.y = pos.y + (dest.y - pos.y) * k * k;
-                    angle = sinf(k * PI) * (slot % 2 ? -25.0f : 25.0f);   // tumbles on the way, lands upright
-                }
-            }
-        }
-        if (!shown) continue;
-        Rectangle hit = { pos.x - crateS / 2, pos.y - crateS / 2, crateS, crateS };
-        bool hover = false;
-        if (ms.hasResult && result.compiled && UiClickArea(hit, &hover)) ms.crate = i;
-        DrawCrate(pos, crateS, i + 1, stamp, angle);
-        if (hover || ms.crate == i) DrawRectangleLinesEx((Rectangle){ hit.x - 3, hit.y - 3, hit.width + 6, hit.height + 6 }, 2, COL_ACCENT);
-        if (!ms.hasResult) UiTextCentered("?", pos.x, pos.y + crateS / 2 + 2, 16, COL_MUTED);
-    }
-
-    // --- under the floor: what happened
-    float below = beltY + beltH + (compact ? 52 : 64);
-    Rectangle info = { x0, below, w, r.y + r.height - below - 12 };
-    if (ms.runPending) {
-        UiText(TextFormat("Compiling with %s and sending the crates through...", CompilerName(t->lang)), info.x, info.y, 20, COL_ACCENT);
-        return;
-    }
-    if (!ms.hasResult) {
-        float h = 0;
-        if (ms.notice[0]) h += UiWrapped(ms.notice, info.x, info.y, info.width, 18, COL_ACCENT) + 8;
-        UiWrapped("Each crate is one test: its input goes into your program, and the output must match exactly. "
-                  "Press Run & Check (or Ctrl+Enter) to start the belt.\n"
-                  "Editing: Ctrl+Z undo, Ctrl+Y redo, Ctrl+A select all, Ctrl+C / X / V, Tab / Shift+Tab indent.",
-                  info.x, info.y + h, info.width, 17, COL_MUTED);
-        return;
-    }
-    if (!result.compiled) {
-        DrawCompileLog(info, "The machine jammed: your code didn't compile. Read the first error, fix it and try again.");
-        return;
-    }
-
-    int passCount = 0;
-    for (int i = 0; i < result.testCount; i++) if (result.passed[i]) passCount++;
-    int show = ms.crate >= 0 ? ms.crate : FirstFailure();
-    if (result.allPassed) {
-        UiText(TextFormat("All %d crates shipped!", result.testCount), info.x, info.y, 21, COL_GOOD);
-    } else {
-        int f = FirstFailure();
-        const char *msg;
-        if (result.status[f] == RUN_TIMEOUT || result.status[f] == RUN_TOO_MUCH_OUTPUT)
-            msg = TextFormat("Crate #%d jammed the machine - is there a loop that never ends?", f + 1);
-        else if (result.status[f] == RUN_CRASHED)
-            msg = TextFormat("Your program crashed on crate #%d.", f + 1);
-        else
-            msg = TextFormat("%d of %d crates shipped. The rest fell off the belt - click one to see why.", passCount, result.testCount);
-        UiText(msg, info.x, info.y, 20, COL_BAD);
-    }
-    if (show < 0) show = 0;
-    const TestCase *tc = &t->tests[show];
-    float boxY = info.y + 30, boxH = info.height - 30;
-    float colW = (info.width - 24) / 3;
-    DrawOutputBox(TextFormat("Crate #%d input", show + 1), tc->input ? tc->input : "", (Rectangle){ info.x, boxY, colW, boxH }, COL_MUTED);
-    DrawOutputBox("Expected output", tc->expected, (Rectangle){ info.x + colW + 12, boxY, colW, boxH }, COL_MUTED);
-    DrawOutputBox("Your output", result.actual[show], (Rectangle){ info.x + (colW + 12) * 2, boxY, colW, boxH },
-                  result.passed[show] ? COL_GOOD : COL_BAD);
-}
-
-// ---------------------------------------------------------------- Robot Rescue and Memory Heist
-
-static void DrawGameView(Rectangle r, const Task *t)
-{
-    DrawRectangleRounded(r, 0.03f, 8, COL_PANEL);
-    bool robot = (t->mode == MODE_ROBOT);
-    const char *what = robot ? "Maze" : "Street";
-    float x = r.x + 12, w = r.width - 24;
-
-    // controls on the right, tabs (one per test) in the space left of them
-    Rectangle replay = { r.x + r.width - 12 - 86, r.y + 10, 86, 34 };
-    Rectangle speed = { replay.x - 6 - 52, r.y + 10, 52, 34 };
-    if (ms.hasResult && result.compiled && UiButton(replay, "Replay", COL_PANEL_HI)) {
-        if (robot) RobotReplay(); else HeistReplay();
-    }
-    static const float speeds[] = { 5, 14, 40 };
-    if (UiButton(speed, ms.speed == 0 ? "1x" : ms.speed == 1 ? "3x" : "8x", COL_PANEL_HI)) ms.speed = (ms.speed + 1) % 3;
-    RobotSetSpeed(speeds[ms.speed]);
-    HeistSetSpeed(speeds[ms.speed]);
-
-    float tabsW = speed.x - 10 - x;
-    float tabW = fminf(120, (tabsW - 6 * (t->testCount - 1)) / (float)t->testCount);
-    bool shortLabels = tabW < 92;
-    for (int i = 0; i < t->testCount; i++) {
-        Rectangle tab = { x + i * (tabW + 6), r.y + 10, tabW, 34 };
-        bool hover = false;
-        if (UiClickArea(tab, &hover)) ShowTest(i);
-        Color fill = (i == ms.sel) ? COL_PANEL_HI : (Color){ 38, 41, 53, 255 };
-        if (hover) fill = ColorBrightness(fill, 0.15f);
-        DrawRectangleRounded(tab, 0.3f, 6, fill);
-        Color dot = COL_MUTED;
-        if (ms.hasResult && result.compiled) dot = result.passed[i] ? COL_GOOD : COL_BAD;
-        DrawCircleV((Vector2){ tab.x + 14, tab.y + 17 }, 6, dot);
-        const char *label = shortLabels ? TextFormat("%d", i + 1) : TextFormat("%s %d", what, i + 1);
-        UiText(label, tab.x + 26, tab.y + 7, 18, i == ms.sel ? COL_TEXT : COL_MUTED);
-    }
-
-    float consoleH = fmaxf(90, r.height * 0.22f);
-    float statusH = 48;
-    Rectangle canvas = { x, r.y + 54, w, r.height - 54 - consoleH - statusH - 20 };
-    DrawRectangleRounded(canvas, 0.03f, 6, (Color){ 24, 26, 34, 255 });
-    Rectangle inner = { canvas.x + 8, canvas.y + 8, canvas.width - 16, canvas.height - 16 };
-    if (robot) RobotDraw(inner, ms.sel); else HeistDraw(inner, ms.sel);
-
-    // status line
-    float sy = canvas.y + canvas.height + 10;
-    const char *status = NULL;
-    Color statusColor = COL_MUTED;
-    bool playing = robot ? RobotPlaying() : HeistPlaying();
-    if (ms.runPending) {
-        status = TextFormat("Compiling with %s and sending in the %s...", CompilerName(t->lang), robot ? "robot" : "thief");
-        statusColor = COL_ACCENT;
-    } else if (!ms.hasResult && ms.notice[0]) {
-        status = ms.notice;
-        statusColor = COL_ACCENT;
-    } else if (!ms.hasResult) {
-        status = robot ? TextFormat("%s %d of %d. Plan the route, then press Run & Check to send the robot in.", what, ms.sel + 1, t->testCount)
-                       : TextFormat("%s %d of %d. Plan the job, then press Run & Check to send the thief in.", what, ms.sel + 1, t->testCount);
-    } else if (!result.compiled) {
-        status = robot ? "The robot won't boot: your code didn't compile." : "The job's off: your code didn't compile.";
-        statusColor = COL_BAD;
-    } else if (playing) {
-        status = robot ? "The robot is following your program..." : "The thief is following your pointers...";
-        statusColor = COL_ACCENT;
-    } else {
-        int i = ms.sel;
-        if (result.passed[i]) {
-            status = robot ? "Rescued! The robot made it out." : "Clean getaway! Nobody saw a thing.";
-            statusColor = COL_GOOD;
-        } else if (result.status[i] == RUN_CRASHED) {
-            status = robot ? "Your program crashed." : "ALARM! Your program crashed - often a NULL or deleted pointer being used.";
-            statusColor = COL_BAD;
-        } else if (result.status[i] == RUN_TIMEOUT || result.status[i] == RUN_TOO_MUCH_OUTPUT) {
-            status = "Stopped after 5 seconds - is a loop going round forever?";
-            statusColor = COL_BAD;
-        } else if (!result.won[i]) {
-            status = result.verdict[i][0] ? result.verdict[i] : "That didn't work.";
-            statusColor = COL_BAD;
-        } else {
-            status = robot ? "The robot made it, but your program didn't print the right message - see below."
-                           : "The job worked, but your program didn't print the right thing - see below.";
-            statusColor = COL_BAD;
-        }
-    }
-    BeginScissorMode((int)x, (int)sy, (int)w, (int)statusH);
-    UiWrapped(status, x, sy, w, 16, statusColor);
-    EndScissorMode();
-
-    // console: what the program printed, or the compiler's errors
-    Rectangle console = { x, r.y + r.height - consoleH - 10, w, consoleH };
-    if (ms.hasResult && !result.compiled) {
-        DrawCompileLog(console, "Compiler errors - read the first one first:");
-        return;
-    }
-    const TestCase *tc = &t->tests[ms.sel];
-    bool showExpected = ms.hasResult && tc->expected && !result.outputOk[ms.sel];
-    float half = showExpected ? (w - 12) / 2 : w;
-    if (ms.hasResult) DrawOutputBox("Your program printed", result.actual[ms.sel], (Rectangle){ x, console.y, half, consoleH }, COL_MUTED);
-    else if (tc->expected) DrawOutputBox("It should print", tc->expected, (Rectangle){ x, console.y, half, consoleH }, COL_MUTED);
-    else DrawOutputBox("Your program printed", "", (Rectangle){ x, console.y, half, consoleH }, COL_MUTED);
-    if (showExpected) DrawOutputBox("It should print", tc->expected, (Rectangle){ x + half + 12, console.y, half, consoleH }, COL_BAD);
 }
 
 // ---------------------------------------------------------------- Bug Hunter
@@ -631,35 +341,6 @@ static void DrawBugClock(Rectangle bar, const Task *t)
 
 // ---------------------------------------------------------------- the left panel
 
-static float DrawObjectives(float x, float y, float w, const Task *t)
-{
-    if (ms.inContract) return 0;
-    unsigned char have = prog.stars[ms.mission];
-    int lines = CountCodeLines(editor.text);
-    const char *third;
-    bool thirdLost = false;
-    if (IsGame(t->mode)) {
-        third = TextFormat("Use %d lines of code or fewer (now %d)", t->parLines, lines);
-        thirdLost = lines > t->parLines;
-    } else {
-        third = "Pass on your first Run & Check";
-        thirdLost = !ms.fresh || (ms.runs > 0 && !(ms.hasResult && result.allPassed && ms.runs == 1));
-    }
-    const char *texts[3] = { t->mode == MODE_BUGS ? "Squash every bug before the clock runs out" : "Clear the mission",
-                             "Don't use the hint or the solution", third };
-    bool lost[3] = { t->mode == MODE_BUGS && ms.timeUp, ms.usedHelp || !ms.fresh, thirdLost };
-    for (int i = 0; i < 3; i++) {
-        bool got = (have >> i) & 1;
-        Vector2 c = { x + 10, y + 11 };
-        if (got) DrawStar(c, 9, COL_GOLD);
-        else DrawStarOutline(c, 9, 1.5f, lost[i] ? COL_BAD : COL_MUTED);
-        UiText(texts[i], x + 28, y + 2, 16, got ? COL_TEXT : lost[i] ? (Color){ 220, 140, 140, 255 } : COL_MUTED);
-        y += 24;
-    }
-    (void)w;
-    return 76;
-}
-
 static void DrawStepPicker(float right, float y)
 {
     const Project *p = GetProject(ms.proj);
@@ -678,83 +359,6 @@ static void DrawStepPicker(float right, float y)
         UiTextCentered(TextFormat("%d", i + 1), cx, y - 9, 18, unlocked ? WHITE : COL_MUTED);
         if (clicked) GoToStep(i);
     }
-}
-
-static void Buttons(Rectangle runBtn, Rectangle hintBtn, Rectangle solBtn, Rectangle rstBtn, const Task *t);
-
-static void DrawLeftPanel(Rectangle left, const Task *t)
-{
-    DrawRectangleRounded(left, 0.03f, 8, COL_PANEL);
-    float x = left.x + 20, w = left.width - 40, y = left.y + 16;
-
-    // mode chip and title
-    Color mc = ModeColor(t->mode);
-    const char *modeName = ms.inContract ? "FACTORY CONTRACT" : TextFormat("%s%s", ModeName(t->mode), Cur()->role == ROLE_BOSS ? "  -  BOSS" : "");
-    float cw = UiTextWidth(modeName, 15) + 44;
-    DrawRectangleRounded((Rectangle){ x, y, cw, 28 }, 0.5f, 6, ColorAlpha(mc, 0.22f));
-    DrawModeIcon(t->mode, (Vector2){ x + 15, y + 14 }, 22);
-    UiText(modeName, x + 32, y + 6, 15, mc);
-    if (ms.inContract) DrawStepPicker(left.x + left.width - 20, y + 14);
-    y += 38;
-    if (ms.inContract) {
-        const Project *p = GetProject(ms.proj);
-        UiText(TextFormat("Step %d of %d: %s", ms.step + 1, p->stepCount, p->steps[ms.step].title), x, y, 20, COL_TEXT);
-        y += 32;
-    } else {
-        UiText(t->title, x, y, 22, COL_TEXT);
-        y += 34;
-        y += DrawObjectives(x, y, w, t) + 6;
-    }
-
-    float bw = w;
-    Rectangle runBtn = { x, left.y + left.height - 116, bw, 52 };
-    float smallW = (bw - 16) / 3;
-    Rectangle hintBtn = { x, left.y + left.height - 56, smallW, 42 };
-    Rectangle solBtn = { x + smallW + 8, left.y + left.height - 56, smallW, 42 };
-    Rectangle rstBtn = { x + (smallW + 8) * 2, left.y + left.height - 56, smallW, 42 };
-
-    float bottom = runBtn.y - 12;
-    if (ms.showHint && t->hint) {
-        float hh = UiWrappedHeight(t->hint, bw - 28, 16) + 42;
-        Rectangle hb = { x, bottom - hh, bw, hh };
-        DrawRectangleRounded(hb, 0.08f, 6, (Color){ 60, 52, 30, 255 });
-        UiText("Hint", hb.x + 14, hb.y + 9, 17, (Color){ 240, 200, 110, 255 });
-        UiWrapped(t->hint, hb.x + 14, hb.y + 32, bw - 28, 16, COL_TEXT);
-        bottom = hb.y - 10;
-    }
-    if (t->api) {
-        int lines = 1;
-        for (const char *c = t->api; *c; c++) if (*c == '\n') lines++;
-        float ah = lines * 16 * 1.3f + 30;
-        if (ah > (bottom - y) * 0.5f) ah = (bottom - y) * 0.5f;
-        Rectangle ab = { x, bottom - ah, bw, ah };
-        DrawRectangleRounded(ab, 0.06f, 6, COL_CODE_BG);
-        UiText(t->mode == MODE_ROBOT ? "The robot understands" : "The game gives you", ab.x + 10, ab.y + 6, 15, mc);
-        BeginScissorMode((int)ab.x, (int)ab.y, (int)ab.width, (int)ab.height);
-        UiCode(t->api, ab.x + 10, ab.y + 26, 15, COL_CODE_TEXT, 0);
-        EndScissorMode();
-        bottom = ab.y - 10;
-    }
-
-    // the brief scrolls if it's long
-    Rectangle briefArea = { left.x, y, left.width, bottom - y };
-    float briefH = UiWrappedHeight(t->brief, w, 17);
-    if (CheckCollisionPointRec(GetMousePosition(), briefArea)) ms.briefScroll -= GetMouseWheelMove() * 40;
-    float maxBrief = briefH - briefArea.height + 8;
-    if (ms.briefScroll > maxBrief) ms.briefScroll = maxBrief;
-    if (ms.briefScroll < 0) ms.briefScroll = 0;
-    BeginScissorMode((int)briefArea.x, (int)briefArea.y, (int)briefArea.width, (int)briefArea.height);
-    UiWrapped(t->brief, x, briefArea.y + 2 - ms.briefScroll, w, 17, COL_TEXT);
-    EndScissorMode();
-    if (maxBrief > 0) {
-        const char *more = ms.briefScroll < maxBrief - 1 ? "scroll for more  v" : "^  scroll up";
-        float mw = UiTextWidth(more, 14) + 16;
-        Rectangle tag = { left.x + left.width - 20 - mw, briefArea.y + briefArea.height - 20, mw, 20 };
-        DrawRectangleRounded(tag, 0.5f, 6, COL_PANEL_HI);
-        UiText(more, tag.x + 8, tag.y + 3, 14, COL_ACCENT);
-    }
-
-    Buttons(runBtn, hintBtn, solBtn, rstBtn, t);
 }
 
 // Run & Check, Hint, Solution and Reset: the same in every layout
@@ -864,8 +468,9 @@ static void DrawLevelLeft(Rectangle col, const Task *t, const LevelDef *lv, bool
     float x = head.x + 16, y = head.y + 10;
     bool bugs = (t->mode == MODE_BUGS);
     bool boss = !ms.inContract && Cur()->role == ROLE_BOSS;
-    const char *chip = ms.inContract ? "CONTRACT" : bugs ? "BUG HUNTER" : boss ? "BOSS" : lv->name;
-    Color cc = ms.inContract ? ModeColor(MODE_FACTORY) : bugs ? COL_BUGS : boss ? COL_BAD : lv->color;
+    bool chess = !ms.inContract && Cur()->role == ROLE_CHESS;
+    const char *chip = ms.inContract ? "CONTRACT" : bugs ? "BUG HUNTER" : boss ? "BOSS" : chess ? ChessDifficultyName(Cur()->region) : lv->name;
+    Color cc = ms.inContract ? ModeColor(MODE_FACTORY) : bugs ? COL_BUGS : boss ? COL_BAD : chess ? ChessDifficultyColor(Cur()->region) : lv->color;
     float cw = UiTextWidth(chip, 15) + 24;
     DrawRectangleRounded((Rectangle){ x, y, cw, 26 }, 0.5f, 6, ColorAlpha(cc, 0.2f));
     UiText(chip, x + 12, y + 5, 15, cc);
@@ -874,9 +479,14 @@ static void DrawLevelLeft(Rectangle col, const Task *t, const LevelDef *lv, bool
         const Project *p = GetProject(ms.proj);
         title = TextFormat("Step %d of %d: %s", ms.step + 1, p->stepCount, p->steps[ms.step].title);
     }
-    BeginScissorMode((int)(x + cw + 10), (int)y, (int)(head.width - cw - 42), 30);
+    float room = head.width - cw - 42 - (chess ? 124 : 0);
+    BeginScissorMode((int)(x + cw + 10), (int)y, (int)room, 30);
     UiText(title, x + cw + 12, y + 1, 21, COL_TEXT);
     EndScissorMode();
+    if (chess && UiButton((Rectangle){ head.x + head.width - 132, head.y + 8, 120, 30 }, "Commands", COL_PANEL_HI)) {
+        OpenChessHelp(SCREEN_MISSION);
+        return;
+    }
     if (ms.inContract) {
         UiText("Your code carries on from step to step. Steps:", x, y + 36, 15, COL_MUTED);
         DrawStepPicker(head.x + head.width - 16, y + 46);
@@ -985,7 +595,7 @@ static void DrawCelebration(const Task *t)
 {
     if (!ms.celebrate) return;
     // let the replay (or the 3D level's playback) finish before the card covers it
-    if ((t->mode == MODE_ROBOT && RobotPlaying()) || (t->mode == MODE_HEIST && HeistPlaying()) || (CurLevel() && PlaybackBusy()))
+    if (CurLevel() && PlaybackBusy())
         ms.celebrateAt = GetTime() + 0.8;
     if (GetTime() < ms.celebrateAt) return;
     if (!ms.burst) {
@@ -1002,6 +612,7 @@ static void DrawCelebration(const Task *t)
     const char *title;
     if (ms.inContract) title = "STEP COMPLETE!";
     else if (Cur()->role == ROLE_BOSS) title = "BOSS DEFEATED!";
+    else if (t->mode == MODE_CHESS) title = "PUZZLE SOLVED!";
     else if (t->mode == MODE_BUGS) title = "BUGS SQUASHED!";
     else if (t->mode == MODE_ROBOT) title = "ROBOT RESCUED!";
     else if (t->mode == MODE_HEIST) title = "CLEAN GETAWAY!";
@@ -1053,7 +664,8 @@ static void DrawCelebration(const Task *t)
         }
     } else {
         if (UiButton(a, "Keep coding", COL_PANEL_HI)) ms.celebrate = false;
-        if (UiButton(b, Cur()->role == ROLE_BOSS ? "World Map >" : "Back to the level >", COL_ACCENT)) { ms.celebrate = false; GoBack(); }
+        const char *next = Cur()->role == ROLE_BOSS ? "World Map >" : Cur()->role == ROLE_CHESS ? "More puzzles >" : "Back to the level >";
+        if (UiButton(b, next, COL_ACCENT)) { ms.celebrate = false; GoBack(); }
     }
 }
 
@@ -1085,7 +697,7 @@ void ScreenMission(void)
     // A run was asked for last frame (after "Compiling..." was drawn)
     if (ms.runPending) DoRun();
 
-    bool replaying = (t.mode == MODE_ROBOT && RobotPlaying()) || (t.mode == MODE_HEIST && HeistPlaying()) || (lv && PlaybackBusy());
+    bool replaying = lv && PlaybackBusy();
     bool overlay = (ms.celebrate && GetTime() >= ms.celebrateAt && !replaying) || (t.mode == MODE_BUGS && ms.timeUp && !ms.squashed);
     if (!overlay) {
         if (CtrlDown() && IsKeyPressed(KEY_ENTER) && !(t.mode == MODE_BUGS && ms.timeUp)) ms.runPending = true;
@@ -1105,7 +717,8 @@ void ScreenMission(void)
         TopBarRight(done ? TextFormat("%s  -  Completed", lang) : lang, done ? COL_GOOD : COL_MUTED);
     } else {
         const MissionInfo *m = Cur();
-        DrawTopBar(m->tut >= 0 ? TextFormat("%d. %s", m->tut + 1, GetTutorial(m->tut)->title) : m->title);
+        DrawTopBar(m->tut >= 0 ? TextFormat("%d. %s", m->tut + 1, GetTutorial(m->tut)->title)
+                   : m->role == ROLE_CHESS ? TextFormat("Chess Puzzle: %s", m->title) : m->title);
         unsigned char have = prog.stars[ms.mission];
         DrawStarRow(SCREEN_W - 150, 32, 11, have, -1);
         UiText(lang, SCREEN_W - 70, 22, 20, COL_MUTED);
@@ -1114,50 +727,15 @@ void ScreenMission(void)
     UiSetBlocked(overlay);
     if (BackButton("< Back")) { UiSetBlocked(false); GoBack(); return; }
 
-    if (lv) {
-        // a 3D level: brief and editor on the left, the scene and the output on the right
-        float colW = SCREEN_W * 0.41f;
-        if (colW < 470) colW = 470;
-        if (colW > 760) colW = 760;
-        Rectangle col = { 20, 84, colW, SCREEN_H - 104.0f };
-        Rectangle right = { col.x + colW + 16, 84, SCREEN_W - (col.x + colW + 16) - 20, SCREEN_H - 104.0f };
-        if (ms.bigView) right = (Rectangle){ 20, 84, SCREEN_W - 40.0f, SCREEN_H - 104.0f };
-        else DrawLevelLeft(col, &t, lv, overlay);
-        DrawLevelRight(right, &t);
-        UiSetBlocked(false);
-        if (t.mode == MODE_BUGS && !ms.inContract && ms.timeUp && !ms.squashed) DrawTimeUp();
-        DrawCelebration(&t);
-        return;
-    }
-
-    float leftW = SCREEN_W >= 1600 ? 460 : 380;
-    Rectangle left = { 20, 84, leftW, SCREEN_H - 104.0f };
-    DrawLeftPanel(left, &t);
-
-    float rightX = left.x + left.width + 20;
-    float rightW = SCREEN_W - rightX - 20;
-    if (IsGame(t.mode)) {
-        float edW = rightW * (SCREEN_W >= 1600 ? 0.46f : 0.42f);
-        editorRect = (Rectangle){ rightX, 84, edW, SCREEN_H - 104.0f };
-        if (!overlay) EditorUpdate(&editor, editorRect);
-        EditorDraw(&editor, editorRect);
-        Rectangle view = { rightX + edW + 16, 84, rightW - edW - 16, SCREEN_H - 104.0f };
-        DrawGameView(view, &t);
-    } else {
-        float top = 84;
-        if (t.mode == MODE_BUGS && !ms.inContract) {
-            DrawBugClock((Rectangle){ rightX, 84, rightW, 26 }, &t);
-            top += 34;
-        }
-        float edH = (SCREEN_H - top - 34) * 0.56f;
-        editorRect = (Rectangle){ rightX, top, rightW, edH };
-        if (!overlay) EditorUpdate(&editor, editorRect);
-        EditorDraw(&editor, editorRect);
-        DrawBugs(&t);
-        float resY = editorRect.y + edH + 14;
-        DrawFactory((Rectangle){ rightX, resY, rightW, SCREEN_H - 20 - resY }, &t);
-    }
-
+    // the brief and the editor on the left, the scene and the output on the right
+    float colW = SCREEN_W * 0.41f;
+    if (colW < 470) colW = 470;
+    if (colW > 760) colW = 760;
+    Rectangle col = { 20, 84, colW, SCREEN_H - 104.0f };
+    Rectangle right = { col.x + colW + 16, 84, SCREEN_W - (col.x + colW + 16) - 20, SCREEN_H - 104.0f };
+    if (ms.bigView || !lv) right = (Rectangle){ 20, 84, SCREEN_W - 40.0f, SCREEN_H - 104.0f };
+    if (!ms.bigView && lv) DrawLevelLeft(col, &t, lv, overlay);
+    DrawLevelRight(right, &t);
     UiSetBlocked(false);
     if (t.mode == MODE_BUGS && !ms.inContract && ms.timeUp && !ms.squashed) DrawTimeUp();
     DrawCelebration(&t);

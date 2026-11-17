@@ -15,6 +15,7 @@ static const char *ModeBlurb(GameMode mode)
         case MODE_ROBOT: return "Write real code that drives the robot through the maze.";
         case MODE_HEIST: return "Follow pointers along a street of memory without tripping the alarm.";
         case MODE_BUGS:  return "Squash the bugs in a broken program before the clock runs out.";
+        case MODE_CHESS: return "Solve chess puzzles by moving the pieces with pointers.";
         default:         return "Your program is the machine: every test is a crate on the conveyor belt.";
     }
 }

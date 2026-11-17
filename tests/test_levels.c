@@ -16,6 +16,8 @@
 #include "missions.h"
 #include "projects.h"
 #include "game/levels.h"
+#include "game/chess_duel.h"
+#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -331,7 +333,9 @@ static int LineCount(const char *s)
 static void MutateTrace(const char *trace, char *out, int cap, int kind)
 {
     static const char *JUNK[] = { "9 M", "8 X", "7 L", "COPY 99 0", "COPY 7 0", "COPY 3 9", "COPY 1 5", "-1 L", "0 Q", "0 MM",
-                                  "", "COPY", "END", "END WINNER", "0 M\r", "  0 M", "0  M", "COPY 0 0", "COPY 12345 1" };
+                                  "", "COPY", "END", "END WINNER", "0 M\r", "  0 M", "0  M", "COPY 0 0", "COPY 12345 1",
+                                  "W z9 a1 - x", "W a1 a1 Q #", "B h8", "W e2 e4 K +#", "I", "I e9 e4", "W a1 h8 - xxxxxxxxxxxx",
+                                  "B e7 e5 q -", "W a7 a8 Q #extra", "G 3", "T 1 2" };
     char *at = out, *end = out + cap;
     out[0] = '\0';
     int lines = LineCount(trace);
@@ -427,6 +431,20 @@ static void FuzzGame(const LevelDef *lv, const MissionInfo *m, const RunResult *
             CheckEvents(passed, what);
         }
     }
+}
+
+// One turn of a 1v1 game: a program for the side to move, which should (or shouldn't) be played
+static void DuelCase(const char *what, const char *fen, const char *body, bool shouldPlay, const char *traceHas)
+{
+    static char input[200], code[800];
+    snprintf(input, sizeof(input), "FEN %s\nEND\n", fen);
+    snprintf(code, sizeof(code), "#include <stdio.h>\nint main(void)\n{\n    %s\n    return 0;\n}\n", body);
+    TestCase tc = { input, NULL };
+    RunRequest req = { code, LANG_C, "#define CFD_DUEL\n#include \"cfd_chess.h\"\n", "game", true, &tc, 1 };
+    RunProgram(&req, &res);
+    CHECK(res.compiled, "1v1 %s: doesn't compile:\n%s", what, res.compileLog);
+    CHECK(res.passed[0] == shouldPlay, "1v1 %s: the move should%s be played (trace: %s)", what, shouldPlay ? "" : "n't", res.events[0]);
+    if (traceHas) CHECK(strstr(res.events[0], traceHas) != NULL, "1v1 %s: the trace should have \"%s\" (it is: %s)", what, traceHas, res.events[0]);
 }
 
 static void CheckGameMission(const LevelDef *lv, const MissionInfo *m, bool quick)
@@ -558,6 +576,176 @@ int main(int argc, char **argv)
     printf("Memory Heist (the heist library's trace, replayed):\n");
     for (int i = 0; i < MissionCount(); i++)
         if (GetMission(i)->mode == MODE_HEIST) CheckGameMission(&LEVEL_HEIST, GetMission(i), quick);
+
+    // The chess library's rules, counted the standard way: the number of move sequences of
+    // each length from well-known positions (castling, en passant, promotion and pins included)
+    printf("Chess Puzzles (the rules, then every puzzle):\n");
+    {
+        static const struct { const char *fen, *counts; } PERFT[] = {
+            { "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -", "20\n400\n8902\n" },
+            { "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -", "48\n2039\n97862\n" },
+            { "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -", "14\n191\n2812\n" },
+            { "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq -", "6\n264\n9467\n" },
+            { "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ -", "44\n1486\n62379\n" },
+        };
+        static char inputs[5][160];
+        TestCase tests[5];
+        for (int i = 0; i < 5; i++) {
+            snprintf(inputs[i], sizeof(inputs[i]), "FEN %s\nGOAL MATE 1\nEND\n", PERFT[i].fen);
+            tests[i] = (TestCase){ inputs[i], PERFT[i].counts };
+        }
+        const char *code = "#include <stdio.h>\n"
+                           "int main(void)\n"
+                           "{\n"
+                           "    for (int d = 1; d <= 3; d++) printf(\"%ld\\n\", cfd_perft(&cfd_pos, d));\n"
+                           "    return 0;\n"
+                           "}\n";
+        RunRequest req = { code, LANG_C, "#define CFD_PERFT\n#include \"cfd_chess.h\"\n", "game", true, tests, 5 };
+        int before = failures;
+        RunProgram(&req, &res);
+        CHECK(res.compiled, "chess perft: doesn't compile:\n%s", res.compileLog);
+        for (int i = 0; res.compiled && i < 5; i++)
+            CHECK(res.outputOk[i], "chess perft position %d: got %s", i + 1, res.output[i]);
+        printf("  %-24s %s\n", "the rules (perft)", failures == before ? "ok" : "FAILED");
+    }
+    for (int i = 0; i < MissionCount(); i++)
+        if (GetMission(i)->mode == MODE_CHESS) CheckGameMission(&LEVEL_CHESS, GetMission(i), quick);
+
+    printf("1v1 chess (one coded move per turn, the game rules, the computer):\n");
+    {
+        int before = failures;
+        DuelCase("White's first move", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                 "Square *p = at(\"e2\"); move(p, p + 16);", true, "W e2 e4 - -");
+        DuelCase("Black's answer", "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+                 "Square *p = at(\"e7\"); move(p, p - 16);", true, "B e7 e5 - -");
+        DuelCase("Black moving a white piece", "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+                 "move(at(\"e4\"), at(\"e5\"));", false, "I e4 e5");
+        DuelCase("two moves in one turn", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                 "move(at(\"e2\"), at(\"e4\")); move(at(\"d2\"), at(\"d4\"));", false, "END FAIL One move per turn");
+        DuelCase("no move at all", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "printf(\"hmm\\n\");", false, "END FAIL");
+        DuelCase("Black promotes (and mates)", "8/8/8/8/8/7k/p7/7K b - - 0 1", "promote(at(\"a2\"), at(\"a1\"), 'Q');", true, "B a2 a1 Q #");
+        DuelCase("Black castles", "r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1", "move(at(\"e8\"), at(\"g8\"));", true, "B e8 g8 - c");
+        DuelCase("Black en passant", "8/8/8/8/3Pp3/8/8/K6k b - d3 0 1", "move(at(\"e4\"), at(\"d3\"));", true, "B e4 d3 - e");
+        DuelCase("a black pawn moving backwards", "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+                 "Square *p = at(\"d7\"); move(p - 16, p - 8);", false, "END FAIL");
+        // the second way to move: pick up a piece and point hand at its new square
+        DuelCase("way 2, hand = at()", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                 "pick_up(at(\"e2\")); hand = at(\"e4\");", true, "W e2 e4 - -");
+        DuelCase("way 2, a knight with hand += 15", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                 "pick_up(at(\"g1\")); hand += 15;", true, "W g1 f3 - -");
+        DuelCase("way 2, Black with hand -= 16", "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+                 "pick_up(at(\"e7\")); hand -= 16;", true, "B e7 e5 - -");
+        DuelCase("way 2, put_down() then end", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                 "pick_up(at(\"d2\")); hand += 16; put_down();", true, "W d2 d4 - -");
+        DuelCase("way 2, hand off the board at the end", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                 "pick_up(at(\"h2\")); hand += 64;", false, "hand points outside the board");
+        DuelCase("way 2, put straight back", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                 "pick_up(at(\"e2\"));", false, "straight back");
+        DuelCase("way 2, the other side's piece", "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+                 "pick_up(at(\"e4\"));", false, "only pick up your own pieces");
+        DuelCase("way 2, a blocked bishop", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                 "pick_up(at(\"f1\")); hand += 9 * 2;", false, "in the way");
+        DuelCase("way 2, hand without pick_up", "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                 "hand = at(\"e4\");", false, "nothing was picked up");
+        printf("  %-24s %s\n", "the library, both sides", failures == before ? "ok" : "FAILED");
+
+        // puzzles solved the second way, several moves in one program
+        before = failures;
+        static const struct { const char *id, *body; } WAY2[] = {
+            { "chess-backrank", "pick_up(at(\"a1\")); hand += 8 * 7;" },
+            { "chess-fork", "pick_up(at(\"b5\")); hand += 17; put_down();\n    pick_up(at(\"c7\")); hand = find('q');" },
+            { "chess-roller", "pick_up(at(\"b2\")); hand += 8 * 5; put_down();\n    pick_up(at(\"a1\")); hand = at(\"a8\");" },
+            { "chess-pawnrace", "for (Square *p = board; p < board + 64; p++) {\n"
+                                "        if (p->piece != 'P') continue;\n"
+                                "        int clear = 1;\n"
+                                "        for (Square *s = p; s->rank < 7; ) { s += 8; if (s->piece != '.') clear = 0; }\n"
+                                "        if (!clear) continue;\n"
+                                "        for (Square *pawn = p; pawn->rank < 7; pawn += 8) { pick_up(pawn); hand += 8; put_down(); }\n"
+                                "        return 0;\n"
+                                "    }" },
+        };
+        for (int i = 0; i < (int)(sizeof(WAY2) / sizeof(WAY2[0])); i++) {
+            int mi = FindMission(WAY2[i].id);
+            CHECK(mi >= 0, "%s: not found", WAY2[i].id);
+            if (mi < 0) continue;
+            const MissionInfo *m = GetMission(mi);
+            static char code[1200];
+            snprintf(code, sizeof(code), "#include <stdio.h>\nint main(void)\n{\n    %s\n    return 0;\n}\n", WAY2[i].body);
+            RunRequest req = { code, m->lang, m->prelude, "game", true, m->tests, m->testCount };
+            RunProgram(&req, &res);
+            CHECK(res.compiled && res.allPassed, "%s solved with pick_up() and hand should pass (%s)", WAY2[i].id, res.compiled ? res.events[0] : res.compileLog);
+        }
+        printf("  %-24s %s\n", "puzzles, the second way", failures == before ? "ok" : "FAILED");
+
+        before = failures;
+        static ChessGame g;
+        char fen[100], flags[8];
+        ChessGameStart(&g);
+        ChessGameFen(&g, fen, sizeof(fen));
+        CHECK(strcmp(fen, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") == 0, "start FEN: %s", fen);
+        // the fool's mate: f3 e5 g4 Qh4#
+        static const int fool[4][2] = { { 13, 21 }, { 52, 36 }, { 14, 30 }, { 59, 31 } };
+        for (int i = 0; i < 4; i++) {
+            ChessMove m;
+            CHECK(ChessGameFind(&g, fool[i][0], fool[i][1], 0, &m), "fool's mate move %d isn't legal", i + 1);
+            ChessGamePlay(&g, m, flags, sizeof(flags));
+            if (i == 0) { ChessGameFen(&g, fen, sizeof(fen)); CHECK(strcmp(fen, "rnbqkbnr/pppppppp/8/8/8/5P2/PPPPP1PP/RNBQKBNR b KQkq - 0 1") == 0, "after f3: %s", fen); }
+        }
+        CHECK(ChessGameState(&g) == GAME_CHECKMATE, "the fool's mate should be checkmate (state %d)", ChessGameState(&g));
+        CHECK(strcmp(g.notation[3], "Qd8-h4#") == 0 && strcmp(flags, "#") == 0, "fool's mate notation %s flags %s", g.notation[3], flags);
+        ChessGameFromFen(&g, "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1");
+        CHECK(ChessGameState(&g) == GAME_STALEMATE, "stalemate (state %d)", ChessGameState(&g));
+        ChessGameFromFen(&g, "8/8/8/4k3/8/8/8/2B1K3 w - - 0 1");
+        CHECK(ChessGameState(&g) == GAME_MATERIAL, "king and bishop against a king is a draw");
+        ChessGameFromFen(&g, "8/8/8/4k3/8/8/8/R3K3 w - - 0 1");
+        CHECK(ChessGameState(&g) == GAME_ON, "a rook can still mate");
+        ChessGameFromFen(&g, "8/8/8/4k3/8/8/8/R3K3 w - - 100 80");
+        CHECK(ChessGameState(&g) == GAME_FIFTY, "the fifty-move rule");
+        ChessGameStart(&g);
+        static const int shuffle[4][2] = { { 6, 21 }, { 62, 45 }, { 21, 6 }, { 45, 62 } };
+        for (int rep = 0; rep < 2; rep++)
+            for (int i = 0; i < 4; i++) {
+                ChessMove m;
+                if (ChessGameFind(&g, shuffle[i][0], shuffle[i][1], 0, &m)) ChessGamePlay(&g, m, flags, sizeof(flags));
+            }
+        CHECK(ChessGameState(&g) == GAME_REPETITION, "threefold repetition (state %d)", ChessGameState(&g));
+        printf("  %-24s %s\n", "the game rules", failures == before ? "ok" : "FAILED");
+
+        // the computer: legal moves, mate in one for either side, a free queen, whole games, and speed
+        before = failures;
+        static const char *MATES[] = { "6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1", "6rk/6pp/8/6N1/8/8/8/6K1 w - - 0 1", "7k/Q7/6K1/8/8/8/8/8 w - - 0 1",
+                                       "k7/pp6/8/8/8/8/8/4R1K1 w - - 0 1", "r5k1/8/8/8/8/8/5PPP/6K1 b - - 0 1" };
+        for (int level = 0; level < 3; level++) {
+            for (int i = 0; i < 5; i++) {
+                ChessGameFromFen(&g, MATES[i]);
+                ChessMove m = ChessComputerMove(&g, level), found;
+                CHECK(ChessGameFind(&g, m.from, m.to, m.promo, &found), "level %d, mate %d: an illegal move", level, i + 1);
+                ChessGamePlay(&g, m, flags, sizeof(flags));
+                CHECK(ChessGameState(&g) == GAME_CHECKMATE, "level %d should find the mate in position %d", level, i + 1);
+            }
+            ChessGameFromFen(&g, "6k1/5ppp/8/3q4/8/2N5/5PPP/6K1 w - - 0 1");
+            ChessMove m = ChessComputerMove(&g, level);
+            if (level > 0) CHECK(m.from == 18 && m.to == 35, "level %d should take the free queen", level);
+        }
+        clock_t t0 = clock();
+        ChessGameFromFen(&g, "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");   // a busy middlegame
+        ChessMove first = ChessComputerMove(&g, 2), ok;
+        double secs = (double)(clock() - t0) / CLOCKS_PER_SEC;
+        CHECK(ChessGameFind(&g, first.from, first.to, first.promo, &ok), "hard: an illegal move");
+        CHECK(secs < 4.0, "hard takes %.1f seconds for a middlegame move", secs);
+        for (int game = 0; game < 3; game++) {
+            ChessGameStart(&g);
+            int wl = game == 0 ? 1 : game == 1 ? 0 : 2, bl = game == 0 ? 0 : game == 1 ? 1 : 1, plies = 0;
+            while (ChessGameState(&g) == GAME_ON && plies < 160) {
+                ChessMove m = ChessComputerMove(&g, g.white ? wl : bl), legal;
+                if (!ChessGameFind(&g, m.from, m.to, m.promo, &legal)) { CHECK(false, "game %d: an illegal move at ply %d", game + 1, plies); break; }
+                ChessGamePlay(&g, legal, flags, sizeof(flags));
+                plies++;
+            }
+            checks++;
+        }
+        printf("  %-24s %s  (hard, a middlegame move: %.2f s)\n", "the computer player", failures == before ? "ok" : "FAILED", secs);
+    }
 
     printf("\n%d checks, %d failed\n", checks, failures);
     return failures ? 1 : 0;

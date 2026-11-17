@@ -37,6 +37,10 @@ typedef struct {
     int      bestStreak;
     int      lastDay;                         // the last day with progress, as YYYYMMDD
     int      warmupBest;                      // best Output Rush warm-up score
+
+    // Chess puzzles: the chosen look (unlocked with stars)
+    int      chessPieces;                     // piece set, 0 = Classic
+    int      chessBoard;                      // board, 0 = Wood
 } Progress;
 
 // Loads the save file if there is one (missing or broken files just mean a fresh start).

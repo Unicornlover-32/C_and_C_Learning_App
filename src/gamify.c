@@ -55,7 +55,7 @@ int TotalStars(void)
 {
     int n = 0;
     for (int i = 0; i < MissionCount() && i < MAX_MISSIONS; i++)
-        if (GetMission(i)->role != ROLE_SIDE) n += StarCount(prog.stars[i]);
+        if (GetMission(i)->role != ROLE_SIDE && GetMission(i)->role != ROLE_CHESS) n += StarCount(prog.stars[i]);
     for (int t = 0; t < TutorialCount() && t < MAX_TUTORIALS; t++) n += prog.rushStars[t];
     return n;
 }
@@ -77,7 +77,26 @@ static int SideCount(void)
 
 int MaxSideStars(void) { return 3 * SideCount(); }
 
-int MaxStars(void) { return 3 * (MissionCount() - SideCount() + TutorialCount()); }
+int ChessStars(void)
+{
+    int n = 0;
+    for (int i = 0; i < MissionCount() && i < MAX_MISSIONS; i++)
+        if (GetMission(i)->role == ROLE_CHESS) n += StarCount(prog.stars[i]);
+    return n;
+}
+
+static int ChessCount(void)
+{
+    int n = 0;
+    for (int i = 0; i < MissionCount(); i++) if (GetMission(i)->role == ROLE_CHESS) n++;
+    return n;
+}
+
+int MaxChessStars(void) { return 3 * ChessCount(); }
+
+int AllStars(void) { return TotalStars() + SideStars() + ChessStars(); }
+
+int MaxStars(void) { return 3 * (MissionCount() - SideCount() - ChessCount() + TutorialCount()); }
 
 static int Today(void)
 {
@@ -142,7 +161,7 @@ static void CheckBadges(void)
             else if (m->region >= 0 && m->region < MAX_REGIONS) regionDone[m->region] = true;
         }
         if (done && m->role == ROLE_BOSS) GiveBadge(BADGE_BOSS_SLAYER);
-        if ((prog.stars[i] & STAR_MASTER) && (m->mode == MODE_ROBOT || m->mode == MODE_HEIST)) GiveBadge(BADGE_LEAN_CODER);
+        if ((prog.stars[i] & STAR_MASTER) && (m->mode == MODE_ROBOT || m->mode == MODE_HEIST || m->mode == MODE_CHESS)) GiveBadge(BADGE_LEAN_CODER);
         if ((prog.stars[i] & STAR_MASTER) && m->mode == MODE_BUGS) GiveBadge(BADGE_ZERO_BUGS);
     }
     if (cleared >= 1) GiveBadge(BADGE_FIRST_STEPS);
@@ -203,6 +222,11 @@ int AwardRush(int tut, int stars, int mistakes)
     }
     if (mistakes == 0) GiveBadge(BADGE_FLAWLESS);
     return Finish(xp);
+}
+
+int AwardDuel(int level)
+{
+    return Finish(level <= 0 ? 40 : level == 1 ? 80 : 150);
 }
 
 int AwardWarmup(int score, int correct)

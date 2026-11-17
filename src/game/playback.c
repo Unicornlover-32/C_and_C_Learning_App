@@ -464,7 +464,8 @@ void PlaybackResults(Rectangle r)
         if (failed && ev->expected[0]) expMark = LineOf(tc->expected, ev->expected);
         else if (!pb.done && pb.printed > 0) expMark = pb.printed - 1;
     }
-    OutputBox(b, "Expected output", COL_MUTED, tc->expected, -1, expMark, failed ? COL_GOOD : COL_ACCENT, spacing, "(nothing)");
+    OutputBox(b, "Expected output", COL_MUTED, tc->expected, -1, expMark, failed ? COL_GOOD : COL_ACCENT, spacing,
+              tc->expected ? "(nothing)" : "(any output - the game decides)");
 
     if (!pb.hasRun) {
         OutputBox(c, "Your output", COL_MUTED, "", 0, -1, COL_ACCENT, false, pb.compileFailed ? "(it didn't compile)" : "(press Run & Check)");

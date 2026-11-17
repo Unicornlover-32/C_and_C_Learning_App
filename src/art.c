@@ -8,6 +8,7 @@ Color ModeColor(GameMode mode)
         case MODE_ROBOT: return COL_ROBOT;
         case MODE_HEIST: return COL_HEIST;
         case MODE_BUGS:  return COL_BUGS;
+        case MODE_CHESS: return COL_CHESS;
         default:         return COL_FACTORY;
     }
 }
@@ -188,12 +189,24 @@ void IconMedal(Vector2 c, float s, Color color, int index)
     DrawStar((Vector2){ c.x, c.y + s * 0.11f }, s * 0.16f + (index % 3) * s * 0.01f, (Color){ 255, 255, 255, 230 });
 }
 
+void IconPawn(Vector2 c, float s, Color color)
+{
+    Color dark = ColorBrightness(color, -0.45f);
+    DrawRectangleRounded((Rectangle){ c.x - s * 0.34f, c.y + s * 0.3f, s * 0.68f, s * 0.16f }, 0.5f, 6, dark);
+    DrawRectangleRounded((Rectangle){ c.x - s * 0.27f, c.y + s * 0.2f, s * 0.54f, s * 0.14f }, 0.5f, 6, color);
+    Tri((Vector2){ c.x - s * 0.2f, c.y + s * 0.22f }, (Vector2){ c.x + s * 0.2f, c.y + s * 0.22f }, (Vector2){ c.x, c.y - s * 0.12f }, color);
+    DrawRectangleRounded((Rectangle){ c.x - s * 0.17f, c.y - s * 0.1f, s * 0.34f, s * 0.08f }, 0.5f, 6, dark);
+    DrawCircleV((Vector2){ c.x, c.y - s * 0.24f }, s * 0.17f, color);
+    DrawCircleV((Vector2){ c.x - s * 0.05f, c.y - s * 0.29f }, s * 0.05f, ColorBrightness(color, 0.5f));
+}
+
 void DrawModeIcon(GameMode mode, Vector2 c, float s)
 {
     switch (mode) {
         case MODE_ROBOT: IconRobot(c, s, COL_ROBOT); break;
         case MODE_HEIST: IconMask(c, s, COL_HEIST); break;
         case MODE_BUGS:  IconBug(c, s, -PI / 2, COL_BUGS); break;
+        case MODE_CHESS: IconPawn(c, s, COL_CHESS); break;
         default:         IconGear(c, s, (float)GetTime() * 0.6f, COL_FACTORY); break;
     }
 }

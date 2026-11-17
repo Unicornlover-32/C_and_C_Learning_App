@@ -2445,10 +2445,17 @@ static const Mission MISSIONS[] = {
 
 };
 
-int MissionTableCount(void) { return (int)(sizeof(MISSIONS) / sizeof(MISSIONS[0])); }
+// The chess puzzles come after these (chess_puzzles.c)
+extern const Mission CHESS_PUZZLES[];
+int ChessPuzzleCount(void);
+
+#define GAME_MISSIONS ((int)(sizeof(MISSIONS) / sizeof(MISSIONS[0])))
+
+int MissionTableCount(void) { return GAME_MISSIONS + ChessPuzzleCount(); }
 
 const Mission *GetMissionTable(int index)
 {
-    if (index < 0 || index >= MissionTableCount()) return &MISSIONS[0];
+    if (index >= GAME_MISSIONS && index < MissionTableCount()) return &CHESS_PUZZLES[index - GAME_MISSIONS];
+    if (index < 0 || index >= GAME_MISSIONS) return &MISSIONS[0];
     return &MISSIONS[index];
 }

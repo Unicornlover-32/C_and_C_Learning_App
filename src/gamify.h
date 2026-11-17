@@ -34,6 +34,9 @@ int  TotalStars(void);                     // stars from levels, bosses, bonus r
 int  MaxStars(void);
 int  SideStars(void);                      // stars from the optional side quests, counted on their own
 int  MaxSideStars(void);
+int  ChessStars(void);                     // stars from the chess puzzles, counted on their own too
+int  MaxChessStars(void);
+int  AllStars(void);                       // every star there is: what unlocks the chess boards and pieces
 bool MissionCleared(int mission);
 bool LevelCleared(int tut);                // its main mission is cleared
 
@@ -41,6 +44,7 @@ bool LevelCleared(int tut);                // its main mission is cleared
 int  AwardMission(int mission, unsigned char bits);
 int  AwardRush(int tut, int stars, int mistakes);
 int  AwardWarmup(int score, int correct);
+int  AwardDuel(int level);                 // beat the computer at 1v1 chess (0 easy, 1 medium, 2 hard)
 int  AwardLesson(int tut);
 int  AwardContractStep(int proj, int stepsBefore, int stepsNow, int stepCount);
 

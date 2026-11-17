@@ -39,6 +39,7 @@ const char *ModeName(GameMode mode)
         case MODE_ROBOT: return "Robot Rescue";
         case MODE_HEIST: return "Memory Heist";
         case MODE_BUGS:  return "Bug Hunter";
+        case MODE_CHESS: return "Chess Puzzles";
         default:         return "Code Factory";
     }
 }
@@ -144,7 +145,7 @@ static char *BuildBuggy(const char *solution, const Mission *m, MissionInfo *inf
 
 static char *BuildPrelude(const Mission *m)
 {
-    const char *header = (m->mode == MODE_ROBOT) ? "cfd_robot.h" : "cfd_heist.h";
+    const char *header = (m->mode == MODE_ROBOT) ? "cfd_robot.h" : (m->mode == MODE_CHESS) ? "cfd_chess.h" : "cfd_heist.h";
     const char *config = m->config ? m->config : "";
     size_t n = strlen(config) + 64;
     char *p = malloc(n);
@@ -169,7 +170,8 @@ void MissionsInit(void)
         MissionInfo *info = &missions[missionCount];
         memset(info, 0, sizeof(*info));
         int tut = FindTutorialId(m->level);
-        if (m->role != ROLE_BOSS && tut < 0) {
+        bool free = (m->role == ROLE_BOSS || m->role == ROLE_CHESS);    // not part of a level
+        if (!free && tut < 0) {
             fprintf(stderr, "mission %s: unknown level %s\n", m->id, m->level ? m->level : "(none)");
             continue;
         }
@@ -180,8 +182,8 @@ void MissionsInit(void)
         info->role = m->role;
         if (m->role == ROLE_MAIN) info->role = (m->mode == MODE_ROBOT || m->mode == MODE_HEIST) ? ROLE_SIDE : ROLE_BONUS;
         info->lang = m->lang;
-        info->tut = (m->role == ROLE_BOSS) ? -1 : tut;
-        info->region = (m->role == ROLE_BOSS) ? m->region : RegionOf(tut);
+        info->tut = free ? -1 : tut;
+        info->region = free ? m->region : RegionOf(tut);
         info->title = m->title;
         info->brief = m->brief;
         info->api = m->api;
@@ -201,7 +203,7 @@ void MissionsInit(void)
             info->tests = m->tests;
             info->testCount = m->testCount;
         }
-        if (m->mode == MODE_ROBOT || m->mode == MODE_HEIST) {
+        if (m->mode == MODE_ROBOT || m->mode == MODE_HEIST || m->mode == MODE_CHESS) {
             info->prelude = BuildPrelude(m);
             info->parLines = m->parLines ? m->parLines : CountCodeLines(m->solution);
         }
