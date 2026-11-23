@@ -5,6 +5,7 @@
 // (its quiz) and missions in four games: Robot Rescue, Memory Heist, Code Factory and
 // Bug Hunter. Stars, XP, badges and a daily streak keep score.
 #include "app.h"
+#include "game/gfx.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -48,12 +49,19 @@ bool CtrlDown(void)
 }
 
 // The game headers live in game/ next to the app
+// The folder with the game libraries (cfd_robot.h, cfd_heist.h): next to the app, one
+// folder up (a build in src/, like the editor's Run button makes), or where it was started.
+// It looks for the header itself, because src/game is the 3D engine's source folder.
+static bool HasGameLibs(const char *dir) { return FileExists(TextFormat("%s/cfd_robot.h", dir)); }
+
 const char *GameDir(void)
 {
     static char dir[1024];
     if (dir[0]) return dir;
-    snprintf(dir, sizeof(dir), "%sgame", GetApplicationDirectory());
-    if (!DirectoryExists(dir)) snprintf(dir, sizeof(dir), "game");
+    const char *app = GetApplicationDirectory();
+    snprintf(dir, sizeof(dir), "%sgame", app);                             // next to the app
+    if (!HasGameLibs(dir)) snprintf(dir, sizeof(dir), "%s../game", app);  // one folder up
+    if (!HasGameLibs(dir)) snprintf(dir, sizeof(dir), "game");            // where it was started
     for (char *c = dir; *c; c++) if (*c == '\\') *c = '/';
     return dir;
 }
@@ -217,7 +225,7 @@ void ScreenMenu(void)
     float cardW = 440;
     bool wide = SCREEN_W >= 1180;
     float colX = wide ? SCREEN_W / 2.0f - (420 + 40 + cardW) / 2 : SCREEN_W / 2.0f - 210;
-    float top = fmaxf(40, (SCREEN_H - 640) / 2.0f);
+    float top = fmaxf(30, (SCREEN_H - 700) / 2.0f);
 
     // title with the four game icons
     DrawModeIcon(MODE_ROBOT, (Vector2){ colX + 26, top + 30 }, 48);
@@ -236,11 +244,11 @@ void ScreenMenu(void)
     if (next >= 0) UiText(GetTutorial(next)->title, colX + 4, y + 68, 17, COL_MUTED);
     y += 98;
     struct { const char *label; int id; } buttons[] = {
-        { "World Map", 1 }, { "Warm-up: Output Rush", 2 }, { "Factory Contracts", 3 }, { "Profile & Badges", 4 }, { "Exit", 5 },
+        { "World Map", 1 }, { "Warm-up: Output Rush", 2 }, { "Chess: Puzzles & 1v1", 6 }, { "Factory Contracts", 3 }, { "Profile & Badges", 4 }, { "Exit", 5 },
     };
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 6; i++) {
         Rectangle b = { colX, y, bw, 50 };
-        Color c = buttons[i].id == 2 ? (Color){ 150, 60, 85, 255 } : COL_PANEL_HI;
+        Color c = buttons[i].id == 2 ? (Color){ 150, 60, 85, 255 } : buttons[i].id == 6 ? (Color){ 40, 110, 100, 255 } : COL_PANEL_HI;
         if (UiButton(b, buttons[i].label, c)) {
             switch (buttons[i].id) {
                 case 1: OpenMap(); break;
@@ -248,6 +256,7 @@ void ScreenMenu(void)
                 case 3: OpenContracts(-1); break;
                 case 4: OpenProfile(); break;
                 case 5: app.quit = true; break;
+                case 6: OpenChess(); break;
             }
         }
         y += 60;
@@ -289,25 +298,27 @@ void ScreenProfile(void)
     for (int t = 0; t < TutorialCount(); t++) { if (LevelCleared(t)) levels++; if (prog.rushStars[t]) rushes++; }
     for (int p = 0; p < ProjectCount(); p++) if (prog.projSteps[p] >= GetProject(p)->stepCount) contracts++;
     // (TextFormat only has a few buffers, so each value gets its own)
-    static const char *labels[7] = { "Stars", "Levels cleared", "Missions cleared", "Output Rushes",
-                                     "Contracts done", "Streak", "Warm-up best" };
-    char values[7][32];
+    static const char *labels[9] = { "Stars", "Side quest stars", "Chess puzzle stars", "Levels cleared", "Missions cleared",
+                                     "Output Rushes", "Contracts done", "Streak", "Warm-up best" };
+    char values[9][32];
     snprintf(values[0], 32, "%d / %d", TotalStars(), MaxStars());
-    snprintf(values[1], 32, "%d / %d", levels, TutorialCount());
-    snprintf(values[2], 32, "%d / %d", ClearedMissions(), MissionCount());
-    snprintf(values[3], 32, "%d / %d", rushes, TutorialCount());
-    snprintf(values[4], 32, "%d / %d", contracts, ProjectCount());
-    snprintf(values[5], 32, "%d (best %d)", prog.streak, prog.bestStreak);
-    snprintf(values[6], 32, "%d", prog.warmupBest);
-    int cols = w > 1000 ? 4 : 3;
+    snprintf(values[1], 32, "%d / %d", SideStars(), MaxSideStars());
+    snprintf(values[2], 32, "%d / %d", ChessStars(), MaxChessStars());
+    snprintf(values[3], 32, "%d / %d", levels, TutorialCount());
+    snprintf(values[4], 32, "%d / %d", ClearedMissions(), MissionCount());
+    snprintf(values[5], 32, "%d / %d", rushes, TutorialCount());
+    snprintf(values[6], 32, "%d / %d", contracts, ProjectCount());
+    snprintf(values[7], 32, "%d (best %d)", prog.streak, prog.bestStreak);
+    snprintf(values[8], 32, "%d", prog.warmupBest);
+    int cols = w > 1200 ? 5 : w > 1000 ? 4 : 3;
     float cw = (w - (cols - 1) * 12) / cols;
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 9; i++) {
         Rectangle r = { x + (i % cols) * (cw + 12), y + (i / cols) * 70, cw, 60 };
         DrawRectangleRounded(r, 0.2f, 6, (Color){ 38, 41, 53, 255 });
         UiText(labels[i], r.x + 14, r.y + 8, 16, COL_MUTED);
-        UiText(values[i], r.x + 14, r.y + 28, 22, i == 0 ? COL_GOLD : COL_TEXT);
+        UiText(values[i], r.x + 14, r.y + 28, 22, i == 0 ? COL_GOLD : i == 1 ? (Color){ 255, 180, 120, 255 } : i == 2 ? COL_CHESS : COL_TEXT);
     }
-    y += ((7 + cols - 1) / cols) * 70 + 16;
+    y += ((9 + cols - 1) / cols) * 70 + 16;
 
     // badges
     UiText("Badges", x, y, 24, COL_TEXT);
@@ -342,6 +353,7 @@ int main(void)
     SetTargetFPS(60);
 
     UiInit();
+    GameInit();                   // the 3D engine: shaders and meshes
     MissionsInit();               // before loading: progress is matched to missions by id
     ProgressLoad(&prog, PROGRESS_FILE);
     MissionInit();
@@ -364,6 +376,9 @@ int main(void)
             case SCREEN_CONTRACTS: ScreenContracts(); break;
             case SCREEN_CONTRACT:  ScreenContract();  break;
             case SCREEN_PROFILE:   ScreenProfile();   break;
+            case SCREEN_CHESS:     ScreenChess();     break;
+            case SCREEN_DUEL:      ScreenDuel();      break;
+            case SCREEN_CHESS_HELP: ScreenChessHelp(); break;
         }
 
         ParticlesDraw();
@@ -376,6 +391,8 @@ int main(void)
     SaveProgress();
 
     MissionShutdown();
+    DuelShutdown();
+    GameShutdown();
     UiShutdown();
     CloseWindow();
     return 0;

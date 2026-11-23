@@ -13,8 +13,10 @@
 #define COL_FACTORY   (Color){ 255, 170,  70, 255 }
 #define COL_BUGS      (Color){ 120, 215, 110, 255 }
 #define COL_RUSH      (Color){ 255, 110, 140, 255 }
+#define COL_CHESS     (Color){ 110, 225, 200, 255 }
 
 Color ModeColor(GameMode mode);
+void  IconPawn(Vector2 c, float s, Color color);         // a chess pawn
 
 void DrawStar(Vector2 c, float r, Color color);
 void DrawStarOutline(Vector2 c, float r, float thick, Color color);

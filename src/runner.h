@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #define MAX_TESTS      6
-#define OUTPUT_CAP     1024
+#define OUTPUT_CAP     4096
 #define LOG_CAP        4096
 #define EVENTS_CAP     12000
 #define VERDICT_CAP    320
@@ -36,7 +36,8 @@ typedef struct {
     bool      outputOk[MAX_TESTS];          // what it printed matched (always true when nothing is expected)
     bool      won[MAX_TESTS];               // games: the game said the run was a success
     RunStatus status[MAX_TESTS];
-    char      actual[MAX_TESTS][OUTPUT_CAP];
+    char      actual[MAX_TESTS][OUTPUT_CAP];    // what to show: the output, after a note if it crashed or was stopped
+    char      output[MAX_TESTS][OUTPUT_CAP];    // exactly what it printed (normalised), for the game levels
     char      events[MAX_TESTS][EVENTS_CAP];   // games: what happened, one event per line
     char      verdict[MAX_TESTS][VERDICT_CAP]; // games: why the run failed (empty when it won)
     char      compileLog[LOG_CAP];
@@ -61,5 +62,9 @@ void RunProgram(const RunRequest *req, RunResult *out);
 void RunPractice(const char *code, Language lang, const TestCase *tests, int testCount, RunResult *out);
 
 const char *CompilerName(Language lang);
+
+// The comparison rules: drops CR characters, spaces and tabs at the end of each line, and blank
+// lines at the end. Two outputs match when their normalised texts are equal.
+void NormalizeOutput(const char *src, char *dst, unsigned long cap);
 
 #endif

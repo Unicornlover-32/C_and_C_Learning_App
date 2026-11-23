@@ -23,6 +23,9 @@ typedef enum {
     SCREEN_CONTRACTS,
     SCREEN_CONTRACT,
     SCREEN_PROFILE,
+    SCREEN_CHESS,
+    SCREEN_DUEL,
+    SCREEN_CHESS_HELP,
 } Screen;
 
 typedef struct {
@@ -68,6 +71,14 @@ void OpenMission(int mission);
 void OpenContractStep(int proj, int step);
 void MissionLeave(void);                              // saves the code
 void ScreenMission(void);
+
+void OpenChess(void);                                 // the chess puzzles and the board shop
+void ScreenChess(void);
+void OpenChessHelp(Screen from);                      // every chess command, and the pointer explorer
+void ScreenChessHelp(void);
+void OpenDuel(void);                                  // 1v1 chess: code every move
+void ScreenDuel(void);
+void DuelShutdown(void);
 
 void OpenContracts(int region);                       // -1 shows every region
 void ScreenContracts(void);

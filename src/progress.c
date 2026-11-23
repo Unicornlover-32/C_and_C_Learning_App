@@ -7,6 +7,7 @@
 //   <exactly that many bytes of code>
 //   PROJECT <project id> <finished steps> <code length in bytes>
 //   <exactly that many bytes of code>
+//   CHESS <piece set> <board>      (last, so older versions still read everything before it)
 //
 // Everything is matched by id, so adding or reordering levels and missions keeps old
 // progress. Version 1 files (from before the games) are converted when they load.
@@ -105,6 +106,8 @@ static void LoadV2(Progress *p, FILE *f)
                 p->projSteps[i] = value;
                 p->projHasDraft[i] = (len > 0);
             }
+        } else if (strcmp(kind, "CHESS") == 0) {
+            if (fscanf(f, "%d %d", &p->chessPieces, &p->chessBoard) != 2) break;
         } else {
             break;
         }
@@ -150,6 +153,7 @@ bool ProgressSave(const Progress *p, const char *path)
         fwrite(p->projDrafts[i], 1, (size_t)len, f);
         fputc('\n', f);
     }
+    fprintf(f, "CHESS %d %d\n", p->chessPieces, p->chessBoard);
     fclose(f);
     return true;
 }

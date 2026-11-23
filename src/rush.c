@@ -2,7 +2,13 @@
 // one lands. Wrong answers and blocks that land pile up at the bottom (and the question
 // comes back later). A level's Rush uses its own quiz; the Warm-up mixes every level's
 // questions for two minutes.
+//
+// The shaft is a 3D scene. The camera looks straight at the plane z = 0, and every block is
+// a slab whose front face sits on that plane exactly where its 2D rectangle is, so the
+// question text is drawn sharp on top of it in 2D.
 #include "app.h"
+#include "game/stage.h"
+#include "rlgl.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -41,7 +47,43 @@ static struct {
     double bannerAt;
     double burstAt;
     float  burstY;
+
+    // the 3D shaft
+    Rectangle view;                // where the shaft was drawn
+    Camera3D  cam;
+    float     dropY, landed;       // where a wrong block started falling; a flash when one lands
+    float     fallRoll;
 } rs;
+
+#define SHAFT_D   6.0f
+#define SHAFT_FOV 36.0f
+
+// The point on the plane z = 0 under a pixel of the shaft's view
+static Vector3 ToWorld(float px, float py)
+{
+    Ray r = GetScreenToWorldRayEx((Vector2){ px - rs.view.x, py - rs.view.y }, rs.cam, (int)rs.view.width, (int)rs.view.height);
+    float t = fabsf(r.direction.z) > 1e-5f ? -r.position.z / r.direction.z : 0;
+    return Vector3Add(r.position, Vector3Scale(r.direction, t));
+}
+
+// A block: a slab whose front face covers rectangle r, with a glowing frame round the face
+static void Slab(Rectangle r, float depth, Color body, Color edge, float glow, float roll)
+{
+    Vector3 a = ToWorld(r.x, r.y), b = ToWorld(r.x + r.width, r.y + r.height);
+    float w = b.x - a.x, h = a.y - b.y, px = w / r.width, t = 3.5f * px;
+    rlPushMatrix();
+    rlTranslatef((a.x + b.x) / 2, (a.y + b.y) / 2, -depth / 2);
+    rlRotatef(roll, 0, 0, 1);
+    Part(MESH_CUBE, V3(0, 0, 0), V3(w, h, depth), body, 0);
+    float z = depth / 2 + 0.006f;
+    Part(MESH_CUBE, V3(0, h / 2 - t / 2, z), V3(w, t, 0.015f), edge, glow);
+    Part(MESH_CUBE, V3(0, -h / 2 + t / 2, z), V3(w, t, 0.015f), edge, glow);
+    Part(MESH_CUBE, V3(-w / 2 + t / 2, 0, z), V3(t, h, 0.015f), edge, glow);
+    Part(MESH_CUBE, V3(w / 2 - t / 2, 0, z), V3(t, h, 0.015f), edge, glow);
+    rlPopMatrix();
+}
+
+static Vector3 Middle(Rectangle r) { return ToWorld(r.x + r.width / 2, r.y + r.height / 2); }
 
 static const QuizQuestion *Q(QRef r) { return &GetTutorial(r.tut)->quiz[r.q]; }
 
@@ -79,6 +121,8 @@ static void Begin(void)
     rs.startTime = GetTime();
     rs.fallTime = rs.warmup ? 14 : 20;
     rs.xp = 0;
+    FxClear();
+    CamSet(V3(0, 0, SHAFT_D), V3(0, 0, 0), SHAFT_FOV);
     app.screen = SCREEN_RUSH;
 }
 
@@ -171,7 +215,11 @@ static void Answer(int option)
         rs.score += 100 * (1 + rs.combo / 3) + bonus;
         rs.burstAt = GetTime();
         rs.burstY = rs.y;
-        ParticlesBurst(SCREEN_W / 2.0f, rs.y + 60, 50, 320);
+        Vector3 c = Middle((Rectangle){ rs.view.x + 20, rs.y, rs.view.width - 40, rs.blockH });
+        FxSparks(c, 160, COL_RUSH);
+        FxSparks(c, 80, (Color){ 255, 214, 120, 255 });
+        FxSparkle(c, 60, (Color){ 255, 240, 200, 255 });
+        FxConfetti(c, 110, 3.0f);
         Banner(TextFormat("Correct! %s", q->explanation), true);
         rs.active = false;
         if (!rs.warmup) rs.cleared++;
@@ -180,6 +228,8 @@ static void Answer(int option)
         rs.wrong[option] = true;
         rs.dropping = true;
         rs.shake = 0.4f;
+        rs.dropY = rs.y;
+        rs.fallRoll = GetRandomValue(0, 1) ? 1.0f : -1.0f;
     }
 }
 
@@ -196,14 +246,31 @@ static float BlockHeight(const QuizQuestion *q, float w)
     return h + 20;
 }
 
-static void DrawBlock(Rectangle r, const QuizQuestion *q, Color border)
+static void DrawBlockText(Rectangle r, const QuizQuestion *q)
 {
-    DrawRectangleRounded((Rectangle){ r.x + 4, r.y + 6, r.width, r.height }, 0.08f, 8, ColorAlpha(BLACK, 0.35f));
-    DrawRectangleRounded(r, 0.08f, 8, (Color){ 40, 44, 62, 255 });
-    DrawRectangleRoundedLinesEx(r, 0.08f, 8, 3, border);
     float y = r.y + 18;
     y += UiWrapped(q->question, r.x + 20, y, r.width - 40, 22, COL_TEXT);
     if (q->code) UiCodeBlock(q->code, r.x + 20, y + 8, r.width - 40, 16);
+}
+
+// The shaft: a back wall with lines sliding down it, a glowing rail on each side, a floor
+static void DrawShaft(Rectangle play, float time, float danger)
+{
+    Vector3 tl = ToWorld(play.x, play.y), br = ToWorld(play.x + play.width, play.y + play.height);
+    float px = (br.x - tl.x) / play.width, back = -1.2f, grow = (SHAFT_D - back) / SHAFT_D;
+    float w = (br.x - tl.x) * grow + 2, h = (tl.y - br.y) * grow + 2, cx = (tl.x + br.x) / 2, cy = (tl.y + br.y) / 2;
+    Part(MESH_CUBE, V3(cx, cy, back - 0.05f), V3(w, h, 0.1f), (Color){ 22, 24, 36, 255 }, 0);
+    float step = 40 * px * grow, off = fmodf(time * 30 * px * grow, step);
+    for (float y = cy + h / 2 - off; y > cy - h / 2; y -= step)
+        Part(MESH_CUBE, V3(cx, y, back + 0.03f), V3(w, 0.012f, 0.015f), (Color){ 70, 64, 96, 255 }, 0.12f);
+    Color rail = { 255, (unsigned char)Lerpf(110, 70, danger), (unsigned char)Lerpf(140, 70, danger), 255 };
+    float glow = 0.55f + danger * 0.45f * Pulse(time, 4);
+    for (int s = 0; s < 2; s++) {
+        float x = s ? br.x - 3 * px : tl.x + 3 * px;
+        Part(MESH_CUBE, V3(x, cy, back / 2), V3(6 * px, tl.y - br.y, -back), (Color){ 52, 56, 78, 255 }, 0);
+        Part(MESH_CUBE, V3(x, cy, 0.01f), V3(2.5f * px, tl.y - br.y, 0.02f), rail, glow);
+    }
+    Part(MESH_CUBE, V3(cx, br.y - 0.08f, back / 2), V3(br.x - tl.x, 0.16f, -back + 0.2f), (Color){ 44, 48, 66, 255 }, 0);
 }
 
 void ScreenRush(void)
@@ -232,25 +299,15 @@ void ScreenRush(void)
     float time = (float)GetTime();
     float dt = GetFrameTime();
 
-    // the shaft the blocks fall down
-    DrawRectangleRounded(play, 0.03f, 8, (Color){ 26, 28, 38, 255 });
-    BeginScissorMode((int)play.x, (int)play.y, (int)play.width, (int)play.height);
-    for (float gy = play.y + fmodf(time * 30, 40) - 40; gy < play.y + play.height; gy += 40)
-        DrawLine((int)play.x, (int)gy, (int)(play.x + play.width), (int)gy, (Color){ 255, 255, 255, 8 });
-    EndScissorMode();
+    // the shaft is drawn in 3D; the camera is the same every frame (it only sways a little)
+    rs.view = play;
+    CamSet(V3(0, 0, SHAFT_D), V3(0, 0, 0), SHAFT_FOV);
+    CamUpdate(dt);
+    FxUpdate(dt);
+    rs.cam = CamCurrent();
 
-    // the pile at the bottom
     float brickH = 34;
     float floorY = play.y + play.height - rs.pileCount * brickH;
-    for (int i = 0; i < rs.pileCount; i++) {
-        Rectangle b = { play.x + 6, play.y + play.height - (i + 1) * brickH, play.width - 12, brickH - 4 };
-        DrawRectangleRounded(b, 0.3f, 6, (Color){ 110, 45, 55, 255 });
-        char text[90];
-        snprintf(text, sizeof(text), "x  %.70s", Q(rs.pile[i])->question);
-        BeginScissorMode((int)b.x, (int)b.y, (int)b.width, (int)b.height);
-        UiText(text, b.x + 12, b.y + 6, 16, (Color){ 255, 200, 200, 255 });
-        EndScissorMode();
-    }
 
     // timers
     float elapsed = (float)(GetTime() - rs.startTime);
@@ -258,6 +315,7 @@ void ScreenRush(void)
 
     // the falling block
     if (!rs.over && !rs.active && GetTime() - rs.bannerAt > (rs.bannerGood ? 0.5 : 0.9)) NextBlock();
+    Rectangle block = { 0 };
     if (rs.active) {
         const QuizQuestion *q = Q(rs.cur);
         float bw = play.width - 40;
@@ -273,18 +331,48 @@ void ScreenRush(void)
             rs.y += speed * dt;
             if (rs.y >= landY) {
                 rs.y = landY;
-                ToPile(rs.dropping ? "Not quite - that one's on the pile, and it'll come back later."
-                                   : "Too slow! It landed on the pile, and it'll come back later.");
+                FxDust(ToWorld(play.x + play.width / 2, floorY), 24);
+                rs.landed = 1;
+                ToPile(rs.dropping ? "Not quite - that one is on the pile, and it will come back later."
+                                   : "Too slow! It landed on the pile, and it will come back later.");
             }
         }
-        if (rs.active) {
-            float shakeX = rs.shake > 0 ? sinf(time * 60) * 8 * rs.shake : 0;
-            if (rs.shake > 0) rs.shake -= dt;
-            Color border = rs.dropping ? COL_BAD : COL_RUSH;
-            BeginScissorMode((int)play.x, (int)play.y, (int)play.width, (int)play.height);
-            DrawBlock((Rectangle){ play.x + 20 + shakeX, rs.y, bw, rs.blockH }, q, border);
-            EndScissorMode();
-        }
+        float shakeX = rs.shake > 0 ? sinf(time * 60) * 8 * rs.shake : 0;
+        if (rs.shake > 0) rs.shake -= dt;
+        block = (Rectangle){ play.x + 20 + shakeX, rs.y, bw, rs.blockH };
+    }
+    rs.landed = fmaxf(0, rs.landed - dt * 2);
+
+    // the 3D shaft: the wall, the rails, the pile of missed questions and the falling block
+    float danger = Clamp01((rs.pileCount - PILE_MAX * 0.5f) / (PILE_MAX * 0.5f));
+    SceneBegin(play);
+    DrawShaft(play, time, danger);
+    for (int i = 0; i < rs.pileCount; i++) {
+        Rectangle br = { play.x + 6, play.y + play.height - (i + 1) * brickH, play.width - 12, brickH - 4 };
+        float flash = i == rs.pileCount - 1 ? rs.landed : 0;
+        Slab(br, 0.45f, (Color){ 96, 40, 50, 255 }, (Color){ 235, 90, 100, 255 }, 0.3f + flash, 0);
+    }
+    if (rs.active) {
+        float roll = rs.dropping ? rs.fallRoll * Clamp01((rs.y - rs.dropY) / 160.0f) * 7 : 0;
+        Slab(block, 0.55f, rs.dropping ? (Color){ 60, 28, 34, 255 } : (Color){ 32, 36, 52, 255 },
+             rs.dropping ? (Color){ 255, 50, 50, 255 } : COL_RUSH, rs.dropping ? 1.0f : 0.75f, roll);
+    }
+    FxDraw();
+    SceneEnd(play);
+
+    // the text on the blocks (a falling wrong answer tumbles, so it has none)
+    for (int i = 0; i < rs.pileCount; i++) {
+        Rectangle br = { play.x + 6, play.y + play.height - (i + 1) * brickH, play.width - 12, brickH - 4 };
+        char text[90];
+        snprintf(text, sizeof(text), "x  %.70s", Q(rs.pile[i])->question);
+        BeginScissorMode((int)br.x + 4, (int)br.y, (int)br.width - 8, (int)br.height);
+        UiText(text, br.x + 14, br.y + 6, 16, (Color){ 255, 205, 205, 255 });
+        EndScissorMode();
+    }
+    if (rs.active && !rs.dropping) {
+        BeginScissorMode((int)play.x, (int)play.y, (int)play.width, (int)play.height);
+        DrawBlockText(block, Q(rs.cur));
+        EndScissorMode();
     }
 
     // feedback banner
