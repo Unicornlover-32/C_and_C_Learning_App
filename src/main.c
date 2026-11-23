@@ -1,4 +1,4 @@
-// C and C++ for Dummies - a raylib game that teaches C and C++, following the
+// Code Knightmare - a raylib game that teaches C and C++, following the
 // Advanced Programming lecture notes.
 //
 // The world map holds every level. A level is a Briefing (the lesson), an Output Rush
@@ -232,7 +232,7 @@ void ScreenMenu(void)
     DrawModeIcon(MODE_HEIST, (Vector2){ colX + 86, top + 30 }, 48);
     DrawModeIcon(MODE_FACTORY, (Vector2){ colX + 146, top + 30 }, 48);
     DrawModeIcon(MODE_BUGS, (Vector2){ colX + 206, top + 30 }, 48);
-    UiText("C and C++ for Dummies", colX, top + 68, 48, COL_TEXT);
+    UiText("Code Knightmare", colX, top + 68, 48, COL_TEXT);
     UiText("Learn C and C++ by playing through the lecture notes.", colX, top + 126, 20, COL_MUTED);
 
     float y = top + 176, bw = 420;
@@ -346,7 +346,7 @@ void ScreenProfile(void)
 int main(void)
 {
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
-    InitWindow(BASE_W, BASE_H, "C and C++ for Dummies");
+    InitWindow(BASE_W, BASE_H, "Code Knightmare");
     SetWindowMinSize(1100, 640);
     ToggleBorderlessWindowed();   // start full screen, at the monitor's own resolution
     SetExitKey(KEY_NULL);         // Esc is used for "back", not quit

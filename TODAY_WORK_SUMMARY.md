@@ -1,7 +1,7 @@
 # Work Completed Today
 
 **Date:** November 10, 2026  
-**Project:** C and C++ Learning App
+**Project:** Code Knightmare
 
 ## Overview
 

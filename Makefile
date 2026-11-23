@@ -1,4 +1,4 @@
-# C and C++ for Dummies - build with:  make            (main.exe, optimised)
+# Code Knightmare - build with:  make            (main.exe, optimised)
 # Debug build (for the VS Code debugger):  make DEBUG=1  (main_debug.exe, with debug symbols)
 #   In VS Code: F5 builds the debug version and starts it in the debugger;
 #   Ctrl+Shift+B runs the "build debug" task.
