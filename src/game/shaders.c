@@ -9,6 +9,7 @@
 // size, then added back on top of the scene with a soft vignette.
 // If any shader fails to compile, GfxReady() is false and scenes are drawn plain.
 #include "gfx.h"
+#include "../ui.h"
 #include "rlgl.h"
 #include <stddef.h>
 
@@ -252,6 +253,7 @@ void GfxPost(RenderTexture2D scene, Rectangle dest, int viewW, int viewH)
 {
     Rectangle src = { 0, 0, (float)scene.texture.width, -(float)scene.texture.height };
     if (!gfx.ready) {
+        UiApplyScale();   // the scene's render-texture pass reset the UI zoom
         DrawTexturePro(scene.texture, src, dest, (Vector2){ 0, 0 }, 0, WHITE);
         return;
     }
@@ -277,6 +279,7 @@ void GfxPost(RenderTexture2D scene, Rectangle dest, int viewW, int viewH)
 
     // 3. back on top of the scene, with the vignette
     float bloom = 1.25f, vignette = 0.42f;
+    UiApplyScale();   // the render-texture passes reset the UI zoom
     BeginShaderMode(gfx.composite);
     SetShaderValue(gfx.composite, gfx.compBloom, &bloom, SHADER_UNIFORM_FLOAT);
     SetShaderValue(gfx.composite, gfx.compVignette, &vignette, SHADER_UNIFORM_FLOAT);

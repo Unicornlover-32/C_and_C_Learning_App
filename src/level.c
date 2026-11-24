@@ -202,7 +202,7 @@ void ScreenBriefing(void)
     if (lessonScroll > maxScroll) lessonScroll = maxScroll;
     if (lessonScroll < 0) lessonScroll = 0;
 
-    BeginScissorMode((int)view.x, (int)view.y, (int)view.width, (int)view.height);
+    UiBeginScissor((int)view.x, (int)view.y, (int)view.width, (int)view.height);
     float y = panel.y + 32 - lessonScroll;
     float hx = x;
     if (extra) {

@@ -127,7 +127,7 @@ static void DrawPuzzles(Rectangle r)
             if (UiClickArea(c, &hover)) { OpenMission(i); return; }
             DrawRectangleRounded(c, 0.12f, 8, hover ? COL_PANEL_HI : (Color){ 36, 39, 51, 255 });
             DrawRectangle((int)c.x, (int)(c.y + 10), 4, (int)(c.height - 20), dc);
-            BeginScissorMode((int)c.x, (int)c.y, (int)c.width, (int)c.height);
+            UiBeginScissor((int)c.x, (int)c.y, (int)c.width, (int)c.height);
             UiText(m->title, c.x + 16, c.y + 10, 19, COL_TEXT);
             DrawStarRow(c.x + c.width - 44, c.y + 21, 9, prog.stars[i], -1);
             UiWrapped(Teaser(m->brief), c.x + 16, c.y + 40, c.width - 30, 14, COL_MUTED);

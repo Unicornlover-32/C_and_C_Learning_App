@@ -58,7 +58,7 @@ void ScreenContracts(void)
     if (cardW > 1400) cardW = 1400;
     float cardX = (SCREEN_W - cardW) / 2;
 
-    BeginScissorMode(0, (int)top, SCREEN_W, (int)viewH);
+    UiBeginScissor(0, (int)top, SCREEN_W, (int)viewH);
     float y = top + 22 - listScroll;
     IconFactory((Vector2){ cardX + 30, y + 26 }, 52, COL_FACTORY);
     UiWrapped("Bigger programs, built one step at a time - the kind every coding course has you make. Each step is a new order for the "

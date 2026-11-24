@@ -261,7 +261,7 @@ void PlaybackDraw(Rectangle view)
         if (tw > view.width - 20) tw = view.width - 20;
         Rectangle box = { view.x + (view.width - tw) / 2, view.y + view.height - 44, tw, 32 };
         DrawRectangleRounded(box, 0.5f, 6, (Color){ 12, 14, 20, 210 });
-        BeginScissorMode((int)box.x, (int)box.y, (int)box.width, (int)box.height);
+        UiBeginScissor((int)box.x, (int)box.y, (int)box.width, (int)box.height);
         UiTextCentered(tip, box.x + box.width / 2, box.y + 7, 16, COL_TEXT);
         EndScissorMode();
     } else if (pb.done) {
@@ -369,7 +369,7 @@ static void OutputBox(Rectangle r, const char *title, Color titleColor, const ch
     float scroll = (focus + 1) * lh - inner;
     if (scroll < 0) scroll = 0;
 
-    BeginScissorMode((int)box.x, (int)box.y + 4, (int)box.width, (int)box.height - 8);
+    UiBeginScissor((int)box.x, (int)box.y + 4, (int)box.width, (int)box.height - 8);
     if (lines == 0) {
         UiText(empty, box.x + 10, box.y + 8, 15, COL_MUTED);
     } else {
@@ -445,7 +445,7 @@ void PlaybackResults(Rectangle r)
     // up to two lines of explanation
     float msgH = UiWrappedHeight(msg, r.width, 15);
     if (msgH > 40) msgH = 40;
-    BeginScissorMode((int)r.x, (int)r.y, (int)r.width, (int)msgH + 2);
+    UiBeginScissor((int)r.x, (int)r.y, (int)r.width, (int)msgH + 2);
     UiWrapped(msg, r.x, r.y + 1, r.width, 15, col);
     EndScissorMode();
 

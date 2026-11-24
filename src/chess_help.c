@@ -284,7 +284,7 @@ void ScreenChessHelp(void)
     float x = body.x + 24, w = body.width - 48;
     if (CheckCollisionPointRec(GetMousePosition(), body)) scroll -= GetMouseWheelMove() * 40;
     if (scroll < 0) scroll = 0;
-    BeginScissorMode((int)body.x, (int)body.y + 4, (int)body.width, (int)body.height - 80);   // (the buttons sit underneath)
+    UiBeginScissor((int)body.x, (int)body.y + 4, (int)body.width, (int)body.height - 80);   // (the buttons sit underneath)
     y = body.y + 20 - scroll;
     UiText(t->title, x, y, 26, COL_TEXT);
     y += 44;

@@ -4,6 +4,7 @@
 #include "raylib.h"
 
 #define EDITOR_CAP 16384
+#define EDITOR_FONT_SIZE 20
 #define UNDO_MAX   200
 
 typedef struct {

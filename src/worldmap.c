@@ -396,10 +396,13 @@ void ScreenMap(void)
 
     // legend
     float lx = 16, ly = SCREEN_H - 40.0f;
-    DrawRectangleRounded((Rectangle){ lx - 6, ly - 8, 600, 38 }, 0.4f, 6, (Color){ 22, 24, 31, 200 });
-    UiText("Every level is a 3D game.  Badges: side quests -", lx + 4, ly + 2, 16, COL_MUTED);
     GameMode modes[2] = { MODE_ROBOT, MODE_HEIST };
-    float x = lx + 8 + UiTextWidth("Every level is a 3D game.  Badges: side quests -", 16);
+    const char *legend = "Every level is a 3D game.  Badges: side quests -";
+    float legendW = 8 + UiTextWidth(legend, 16);
+    for (int i = 0; i < 2; i++) legendW += 36 + UiTextWidth(ModeName(modes[i]), 16);
+    DrawRectangleRounded((Rectangle){ lx - 6, ly - 8, legendW + 6, 38 }, 0.4f, 6, (Color){ 22, 24, 31, 200 });
+    UiText(legend, lx + 4, ly + 2, 16, COL_MUTED);
+    float x = lx + 8 + UiTextWidth(legend, 16);
     for (int i = 0; i < 2; i++) {
         DrawModeIcon(modes[i], (Vector2){ x + 10, ly + 11 }, 22);
         UiText(ModeName(modes[i]), x + 26, ly + 2, 16, COL_TEXT);

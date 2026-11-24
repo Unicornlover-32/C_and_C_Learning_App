@@ -3,12 +3,16 @@
 
 #include "raylib.h"
 
-// The app runs full screen (F11 toggles a window), so layouts follow the real size.
-// The designs are laid out for 1280 x 720 and stretch to fit anything bigger.
-#define SCREEN_W GetScreenWidth()
-#define SCREEN_H GetScreenHeight()
+// The app runs full screen (F11 toggles a window). The designs are laid out for
+// 1280 x 720; on a bigger screen the whole UI (text, boxes, editor) is zoomed by
+// UiScale() so it stays readable, and SCREEN_W / SCREEN_H are the zoomed-out size
+// every layout works in. Ctrl + / Ctrl - / Ctrl 0 adjust the zoom.
+float UiScale(void);
+#define SCREEN_W ((int)(GetScreenWidth() / UiScale()))
+#define SCREEN_H ((int)(GetScreenHeight() / UiScale()))
 #define BASE_W   1280
 #define BASE_H   720
+#define UI_TEXT_SCALE 1.0f   // extra text-only scale on top of the whole-UI zoom (see UiScale)
 
 // Colour palette
 #define COL_BG        (Color){  22,  24,  31, 255 }
@@ -35,6 +39,12 @@ void  UiShutdown(void);
 void  UiBeginFrame(void);
 void  UiEndFrame(void);
 void  UiSetCursor(int cursor);
+
+// Starts drawing with the UI zoom. Called after BeginDrawing, and again after any
+// render-texture pass (which resets the transform).
+void  UiApplyScale(void);
+// Scissor rectangle in layout coordinates (BeginScissorMode wants real pixels).
+void  UiBeginScissor(float x, float y, float width, float height);
 
 float UiSpacing(float size);
 float UiCodeSpacing(float size);

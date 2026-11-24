@@ -105,7 +105,7 @@ static const LevelDef *CurLevel(void)
     return NULL;
 }
 
-void MissionInit(void) { EditorInit(&editor, 20); }
+void MissionInit(void) { EditorInit(&editor, EDITOR_FONT_SIZE); }
 void MissionShutdown(void) { EditorFree(&editor); }
 
 static void SaveDraft(void)
@@ -264,7 +264,7 @@ static void DrawOutputBox(const char *label, const char *text, Rectangle r, Colo
     UiText(label, r.x, r.y, 16, labelColor);
     Rectangle box = { r.x, r.y + 22, r.width, r.height - 22 };
     DrawRectangleRounded(box, 0.06f, 6, COL_CODE_BG);
-    BeginScissorMode((int)box.x, (int)box.y, (int)box.width, (int)box.height);
+    UiBeginScissor((int)box.x, (int)box.y, (int)box.width, (int)box.height);
     UiCode(text && text[0] ? text : "(nothing)", box.x + 10, box.y + 8, 15, text && text[0] ? COL_CODE_TEXT : COL_MUTED, box.width - 20);
     EndScissorMode();
 }
@@ -276,7 +276,7 @@ static float DrawCompileLog(Rectangle area, const char *intro)
     DrawRectangleRounded(log, 0.04f, 6, COL_CODE_BG);
     if (CheckCollisionPointRec(GetMousePosition(), log)) ms.logScroll -= GetMouseWheelMove() * 40;
     if (ms.logScroll < 0) ms.logScroll = 0;
-    BeginScissorMode((int)log.x, (int)log.y, (int)log.width, (int)log.height);
+    UiBeginScissor((int)log.x, (int)log.y, (int)log.width, (int)log.height);
     float h = UiCode(result.compileLog, log.x + 10, log.y + 8 - ms.logScroll, 15, COL_TEXT, log.width - 20);
     EndScissorMode();
     float maxScroll = h - log.height + 16;
@@ -292,7 +292,7 @@ static void DrawBugs(const Task *t)
     const MissionInfo *m = Cur();
     float lh = EditorLineHeight(&editor);
     float time = (float)GetTime();
-    BeginScissorMode((int)editorRect.x, (int)editorRect.y, (int)editorRect.width, (int)editorRect.height);
+    UiBeginScissor((int)editorRect.x, (int)editorRect.y, (int)editorRect.width, (int)editorRect.height);
     for (int i = 0; i < m->bugCount; i++) {
         int line = EditorFindLine(&editor, m->bugs[i].buggyLine, ms.bugAt[i] >= 0 ? ms.bugAt[i] : m->bugs[i].bugLine);
         bool fixedLine = (line < 0);
@@ -405,7 +405,7 @@ static void Buttons(Rectangle runBtn, Rectangle hintBtn, Rectangle solBtn, Recta
 //          program's output appears line by line as the scene acts it out
 
 // The three stars in one row
-static void DrawObjectivesRow(float x, float y, const Task *t)
+static void DrawObjectivesRow(float x, float y, float maxWidth, const Task *t)
 {
     unsigned char have = prog.stars[ms.mission];
     bool thirdLost = !ms.fresh || (ms.runs > 0 && !(ms.hasResult && result.allPassed && ms.runs == 1));
@@ -417,13 +417,22 @@ static void DrawObjectivesRow(float x, float y, const Task *t)
     }
     const char *texts[3] = { t->mode == MODE_BUGS ? "Squash every bug in time" : "Pass every test", "No hint or solution", third };
     bool lost[3] = { t->mode == MODE_BUGS && ms.timeUp, ms.usedHelp || !ms.fresh, thirdLost };
+    // shrink the row's text (and gaps) to fit the panel instead of running off its edge
+    float size = 15, gapX = 20;
+    float need = 0;
+    for (int i = 0; i < 3; i++) need += 22 + UiTextWidth(texts[i], size) + (i < 2 ? gapX : 0);
+    if (need > maxWidth) {
+        float f = fmaxf(0.75f, maxWidth / need);
+        size *= f;
+        gapX *= f;
+    }
     for (int i = 0; i < 3; i++) {
         bool got = (have >> i) & 1;
         Vector2 c = { x + 9, y + 10 };
         if (got) DrawStar(c, 8, COL_GOLD);
         else DrawStarOutline(c, 8, 1.5f, lost[i] ? COL_BAD : COL_MUTED);
-        UiText(texts[i], x + 22, y + 2, 15, got ? COL_TEXT : lost[i] ? (Color){ 220, 140, 140, 255 } : COL_MUTED);
-        x += 22 + UiTextWidth(texts[i], 15) + 20;
+        UiText(texts[i], x + 22, y + 2 + (15 - size) / 2, size, got ? COL_TEXT : lost[i] ? (Color){ 220, 140, 140, 255 } : COL_MUTED);
+        x += 22 + UiTextWidth(texts[i], size) + gapX;
     }
 }
 
@@ -438,7 +447,7 @@ static void DrawBriefBox(Rectangle r, const Task *t)
     if (CheckCollisionPointRec(GetMousePosition(), area)) ms.briefScroll -= GetMouseWheelMove() * 40;
     if (ms.briefScroll < 0) ms.briefScroll = 0;
 
-    BeginScissorMode((int)area.x, (int)area.y, (int)area.width, (int)area.height);
+    UiBeginScissor((int)area.x, (int)area.y, (int)area.width, (int)area.height);
     float y = area.y - ms.briefScroll;
     if (ms.notice[0] && !hint) y += UiWrapped(ms.notice, x, y, w, 16, COL_ACCENT) + 8;
     y += UiWrapped(hint ? t->hint : t->brief, x, y, w, 16, COL_TEXT) + 6;
@@ -480,7 +489,7 @@ static void DrawLevelLeft(Rectangle col, const Task *t, const LevelDef *lv, bool
         title = TextFormat("Step %d of %d: %s", ms.step + 1, p->stepCount, p->steps[ms.step].title);
     }
     float room = head.width - cw - 42 - (chess ? 124 : 0);
-    BeginScissorMode((int)(x + cw + 10), (int)y, (int)room, 30);
+    UiBeginScissor((int)(x + cw + 10), (int)y, (int)room, 30);
     UiText(title, x + cw + 12, y + 1, 21, COL_TEXT);
     EndScissorMode();
     if (chess && UiButton((Rectangle){ head.x + head.width - 132, head.y + 8, 120, 30 }, "Commands", COL_PANEL_HI)) {
@@ -491,7 +500,7 @@ static void DrawLevelLeft(Rectangle col, const Task *t, const LevelDef *lv, bool
         UiText("Your code carries on from step to step. Steps:", x, y + 36, 15, COL_MUTED);
         DrawStepPicker(head.x + head.width - 16, y + 46);
     } else {
-        DrawObjectivesRow(x, y + 34, t);
+        DrawObjectivesRow(x, y + 34, head.x + head.width - 12 - x, t);
     }
 
     // the buttons along the bottom

@@ -222,7 +222,7 @@ static void HelloOverlay(Rectangle view)
     float cw = MeasureTextEx(gCodeFont, "M", size, sp).x + sp;
     float x = view.x + m.x - cw * (good + bad) / 2, y = view.y + m.y - size / 2;
 
-    BeginScissorMode((int)view.x, (int)view.y, (int)view.width, (int)view.height);
+    UiBeginScissor((int)view.x, (int)view.y, (int)view.width, (int)view.height);
     if (H.blank) {
         const char *t = "(nothing)";
         float w = MeasureTextEx(gCodeFont, t, size * 0.8f, sp).x;

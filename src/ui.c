@@ -1,5 +1,7 @@
 #include "ui.h"
 #include "highlight.h"
+#include "rlgl.h"
+#include <math.h>
 #include <string.h>
 
 Font gUiFont;
@@ -48,10 +50,40 @@ static bool TryLoadFont(Font *out, const char *const *paths, int count, int base
     return false;
 }
 
+// ---------------------------------------------------------------- zoom
+
+static float uiScale = 1.0f;     // layout units -> real pixels
+static float userZoom = 1.0f;    // Ctrl +/- on top of the automatic fit
+static float fontScale = 0.0f;   // the zoom the fonts were last loaded for
+
+float UiScale(void) { return uiScale; }
+
+static float FitScale(void)
+{
+    float w = (float)GetScreenWidth(), h = (float)GetScreenHeight();
+    // fit the 1280 x 720 design to the screen, then apply the user's zoom
+    float s = fminf(w / BASE_W, h / BASE_H) * userZoom;
+    // never zoom so far that the layouts get less room than they need
+    float most = fminf(w / 1100.0f, h / 640.0f);
+    if (s > most) s = most;
+    if (s < 0.75f) s = 0.75f;
+    return s;
+}
+
+// Fonts are rasterised at the zoomed size so big text stays sharp.
+static void LoadFonts(float scale)
+{
+    if (uiCustom) UnloadFont(gUiFont);
+    if (codeCustom) UnloadFont(gCodeFont);
+    uiCustom   = TryLoadFont(&gUiFont, UI_FONT_PATHS, COUNT_OF(UI_FONT_PATHS), (int)(48 * scale + 0.5f));
+    codeCustom = TryLoadFont(&gCodeFont, CODE_FONT_PATHS, COUNT_OF(CODE_FONT_PATHS), (int)(32 * scale + 0.5f));
+    fontScale = scale;
+}
+
 void UiInit(void)
 {
-    uiCustom   = TryLoadFont(&gUiFont, UI_FONT_PATHS, COUNT_OF(UI_FONT_PATHS), 48);
-    codeCustom = TryLoadFont(&gCodeFont, CODE_FONT_PATHS, COUNT_OF(CODE_FONT_PATHS), 20);
+    uiScale = FitScale();
+    LoadFonts(uiScale);
 }
 
 void UiShutdown(void)
@@ -64,6 +96,30 @@ void UiBeginFrame(void)
 {
     clickConsumed = false;
     wantedCursor = MOUSE_CURSOR_DEFAULT;
+
+    bool ctrl = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+    if (ctrl && (IsKeyPressed(KEY_EQUAL) || IsKeyPressed(KEY_KP_ADD)))      userZoom = fminf(userZoom + 0.1f, 1.6f);
+    if (ctrl && (IsKeyPressed(KEY_MINUS) || IsKeyPressed(KEY_KP_SUBTRACT))) userZoom = fmaxf(userZoom - 0.1f, 0.6f);
+    if (ctrl && (IsKeyPressed(KEY_ZERO)  || IsKeyPressed(KEY_KP_0)))        userZoom = 1.0f;
+
+    uiScale = FitScale();
+    if (fabsf(uiScale - fontScale) > 0.01f) LoadFonts(uiScale);
+    SetMouseScale(1.0f / uiScale, 1.0f / uiScale);   // the mouse reports layout coordinates
+}
+
+void UiApplyScale(void)
+{
+    rlDrawRenderBatchActive();
+    rlLoadIdentity();
+    rlScalef(uiScale, uiScale, 1.0f);
+}
+
+void UiBeginScissor(float x, float y, float width, float height)
+{
+    float s = uiScale;
+    int x0 = (int)floorf(x * s), y0 = (int)floorf(y * s);
+    int x1 = (int)ceilf((x + width) * s), y1 = (int)ceilf((y + height) * s);
+    BeginScissorMode(x0, y0, x1 - x0, y1 - y0);
 }
 
 void UiEndFrame(void)
@@ -81,12 +137,14 @@ float UiCodeSpacing(float size) { return codeCustom ? 0.0f : size / 10.0f; }
 
 void UiText(const char *text, float x, float y, float size, Color color)
 {
-    DrawTextEx(gUiFont, text, (Vector2){ x, y }, size, UiSpacing(size), color);
+    float scaled = size * UI_TEXT_SCALE;
+    DrawTextEx(gUiFont, text, (Vector2){ x, y }, scaled, UiSpacing(scaled), color);
 }
 
 float UiTextWidth(const char *text, float size)
 {
-    return MeasureTextEx(gUiFont, text, size, UiSpacing(size)).x;
+    float scaled = size * UI_TEXT_SCALE;
+    return MeasureTextEx(gUiFont, text, scaled, UiSpacing(scaled)).x;
 }
 
 void UiTextCentered(const char *text, float centerX, float y, float size, Color color)
@@ -108,7 +166,7 @@ float UiWrappedHeight(const char *text, float maxWidth, float size)
 
 static float Wrap(const char *text, float x, float y, float maxWidth, float size, Color color, bool draw)
 {
-    float lineH = size * 1.35f;
+    float lineH = size * UI_TEXT_SCALE * 1.35f;
     float cy = y;
     char line[1024];
     char cand[1024];
@@ -160,9 +218,10 @@ static float Wrap(const char *text, float x, float y, float maxWidth, float size
 
 float UiCode(const char *text, float x, float y, float size, Color color, float maxWidth)
 {
-    float lineH = size * 1.3f;
-    float sp = UiCodeSpacing(size);
-    float charW = MeasureTextEx(gCodeFont, "M", size, sp).x + sp;
+    float scaled = size * UI_TEXT_SCALE;
+    float lineH = scaled * 1.3f;
+    float sp = UiCodeSpacing(scaled);
+    float charW = MeasureTextEx(gCodeFont, "M", scaled, sp).x + sp;
     int maxChars = (maxWidth > 0 && charW > 0) ? (int)(maxWidth / charW) : 100000;
     if (maxChars < 1) maxChars = 1;
 
@@ -175,7 +234,7 @@ float UiCode(const char *text, float x, float y, float size, Color color, float 
         bool flush = endOfText || *p == '\n' || n >= maxChars || n >= (int)sizeof(line) - 1;
         if (flush) {
             line[n] = '\0';
-            DrawTextEx(gCodeFont, line, (Vector2){ x, cy }, size, sp, color);
+            DrawTextEx(gCodeFont, line, (Vector2){ x, cy }, scaled, sp, color);
             cy += lineH;
             n = 0;
             if (endOfText) break;
@@ -190,15 +249,16 @@ float UiCode(const char *text, float x, float y, float size, Color color, float 
 float UiCodeBlock(const char *code, float x, float y, float width, float size)
 {
     float pad = 16.0f;
-    float lineH = size * 1.3f;
+    float scaled = size * UI_TEXT_SCALE;
+    float lineH = scaled * 1.3f;
     int lines = 1;
     for (const char *p = code; *p; p++) if (*p == '\n') lines++;
     float h = lines * lineH + pad * 2;
 
     DrawRectangleRounded((Rectangle){ x, y, width, h }, 0.04f, 8, COL_CODE_BG);
     DrawRectangle((int)x, (int)(y + 8), 4, (int)(h - 16), COL_ACCENT);
-    BeginScissorMode((int)x, (int)y, (int)width, (int)h);
-    HlCode(gCodeFont, code, x + pad + 6, y + pad, size, UiCodeSpacing(size), lineH);
+    UiBeginScissor(x, y, width, h);
+    HlCode(gCodeFont, code, x + pad + 6, y + pad, scaled, UiCodeSpacing(scaled), lineH);
     EndScissorMode();
     return h;
 }
@@ -227,8 +287,15 @@ bool UiButton(Rectangle r, const char *label, Color base)
                                                           : ColorBrightness(base, 0.15f);
     DrawRectangleRounded(r, 0.3f, 8, fill);
 
+    // shrink the label if it would run past the button's edges
     float size = 21.0f;
     float tw = UiTextWidth(label, size);
-    UiText(label, r.x + (r.width - tw) / 2.0f, r.y + (r.height - size) / 2.0f, size, WHITE);
+    float room = r.width - 16.0f;
+    if (tw > room && room > 0) {
+        size = fmaxf(13.0f, size * room / tw);
+        tw = UiTextWidth(label, size);
+    }
+    float scaled = size * UI_TEXT_SCALE;
+    UiText(label, r.x + (r.width - tw) / 2.0f, r.y + (r.height - scaled) / 2.0f, size, WHITE);
     return clicked;
 }

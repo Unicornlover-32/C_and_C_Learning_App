@@ -251,7 +251,7 @@ static void RunMove(void)
 
 void OpenDuel(void)
 {
-    if (!editorReady) { EditorInit(&editor, 20); editorReady = true; }
+    if (!editorReady) { EditorInit(&editor, EDITOR_FONT_SIZE); editorReady = true; }
     ChessSetStyle(prog.chessPieces, prog.chessBoard);
     app.screen = SCREEN_DUEL;
     if (D.started && D.phase == PHASE_PLAY) ChessSceneStart(D.game.sq, Yaw());   // the board is shared with the puzzles
@@ -343,7 +343,7 @@ static void DrawMoves(Rectangle r)
     float lh = 20, y0 = r.y + 32;
     int rows = (D.game.plies + 1) / 2, fit = (int)((r.height - 40) / lh);
     int first = rows > fit ? rows - fit : 0;
-    BeginScissorMode((int)r.x, (int)y0, (int)r.width, (int)(r.height - 36));
+    UiBeginScissor((int)r.x, (int)y0, (int)r.width, (int)(r.height - 36));
     for (int row = first; row < rows; row++) {
         float y = y0 + (row - first) * lh;
         UiText(TextFormat("%d.", row + 1), r.x + 14, y, 15, COL_MUTED);
@@ -362,7 +362,7 @@ static void DrawOutput(Rectangle r)
     if (!D.output[0]) return;
     UiText(D.compileError ? "Compiler errors:" : "Your program printed:", x, y, 14, COL_MUTED);
     y += 20;
-    BeginScissorMode((int)x, (int)y, (int)w, (int)(r.y + r.height - 8 - y));
+    UiBeginScissor((int)x, (int)y, (int)w, (int)(r.y + r.height - 8 - y));
     UiCode(D.output, x, y, 14, D.compileError ? (Color){ 255, 170, 170, 255 } : COL_CODE_TEXT, w);
     EndScissorMode();
 }
@@ -451,7 +451,7 @@ void ScreenDuel(void)
     DrawRectangleRounded(api, 0.05f, 8, COL_PANEL);
     if (CheckCollisionPointRec(GetMousePosition(), api)) D.apiScroll -= GetMouseWheelMove() * 30;
     if (D.apiScroll < 0) D.apiScroll = 0;
-    BeginScissorMode((int)api.x, (int)api.y + 6, (int)api.width, (int)api.height - 12);
+    UiBeginScissor((int)api.x, (int)api.y + 6, (int)api.width, (int)api.height - 12);
     float used = UiCode(API, api.x + 14, api.y + 10 - D.apiScroll, 14, COL_CODE_TEXT, api.width - 28);
     EndScissorMode();
     if (D.apiScroll > used - api.height + 20) D.apiScroll = fmaxf(0, used - api.height + 20);

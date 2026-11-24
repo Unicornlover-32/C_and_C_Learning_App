@@ -475,7 +475,7 @@ void EditorDraw(const Editor *e, Rectangle b)
     DrawRectangleRec(b, COL_CODE_BG);
     DrawRectangle((int)b.x, (int)b.y, (int)GUTTER, (int)b.height, (Color){ 24, 26, 33, 255 });
 
-    BeginScissorMode((int)b.x, (int)b.y, (int)b.width, (int)b.height);
+    UiBeginScissor((int)b.x, (int)b.y, (int)b.width, (int)b.height);
 
     int line = 0, ls = 0;
     for (;;) {

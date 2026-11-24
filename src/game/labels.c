@@ -53,7 +53,7 @@ void LabelsDraw(Rectangle view, Camera3D camera)
     if (scale < 0.85f) scale = 0.85f;
     if (scale > 1.6f) scale = 1.6f;
 
-    BeginScissorMode((int)view.x, (int)view.y, (int)view.width, (int)view.height);
+    UiBeginScissor((int)view.x, (int)view.y, (int)view.width, (int)view.height);
     for (int i = 0; i < count; i++) {
         const Label *l = &labels[i];
         if (l->depth < 0.2f) continue;                       // behind the camera

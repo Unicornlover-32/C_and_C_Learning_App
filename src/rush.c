@@ -365,12 +365,12 @@ void ScreenRush(void)
         Rectangle br = { play.x + 6, play.y + play.height - (i + 1) * brickH, play.width - 12, brickH - 4 };
         char text[90];
         snprintf(text, sizeof(text), "x  %.70s", Q(rs.pile[i])->question);
-        BeginScissorMode((int)br.x + 4, (int)br.y, (int)br.width - 8, (int)br.height);
+        UiBeginScissor((int)br.x + 4, (int)br.y, (int)br.width - 8, (int)br.height);
         UiText(text, br.x + 14, br.y + 6, 16, (Color){ 255, 205, 205, 255 });
         EndScissorMode();
     }
     if (rs.active && !rs.dropping) {
-        BeginScissorMode((int)play.x, (int)play.y, (int)play.width, (int)play.height);
+        UiBeginScissor((int)play.x, (int)play.y, (int)play.width, (int)play.height);
         DrawBlockText(block, Q(rs.cur));
         EndScissorMode();
     }
@@ -380,7 +380,7 @@ void ScreenRush(void)
         float a = fminf(1, (float)(6 - (GetTime() - rs.bannerAt)));
         Rectangle b = { play.x, 74, play.width, 30 };
         DrawRectangleRounded(b, 0.4f, 6, ColorAlpha(rs.bannerGood ? COL_GOOD_DARK : COL_BAD_DARK, 0.9f * a));
-        BeginScissorMode((int)b.x, (int)b.y, (int)b.width, (int)b.height);
+        UiBeginScissor((int)b.x, (int)b.y, (int)b.width, (int)b.height);
         UiText(rs.banner, b.x + 14, b.y + 6, 16, ColorAlpha(WHITE, a));
         EndScissorMode();
     }
@@ -399,7 +399,7 @@ void ScreenRush(void)
             DrawRectangleRounded(r, 0.25f, 8, fill);
             DrawCircleV((Vector2){ r.x + 26, r.y + r.height / 2 }, 15, COL_RUSH);
             UiTextCentered(TextFormat("%d", i + 1), r.x + 26, r.y + r.height / 2 - 10, 19, WHITE);
-            BeginScissorMode((int)r.x, (int)r.y, (int)r.width, (int)r.height);
+            UiBeginScissor((int)r.x, (int)r.y, (int)r.width, (int)r.height);
             float th = UiWrappedHeight(q->options[i], r.width - 64, 18);
             UiWrapped(q->options[i], r.x + 52, r.y + (r.height - th) / 2 + 2, r.width - 64, 18, COL_TEXT);
             EndScissorMode();

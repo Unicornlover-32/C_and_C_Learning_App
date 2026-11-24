@@ -1,9 +1,33 @@
 CFD-PROGRESS 2
-PLAYER 290 257 1 1 20261110 0
-LEVEL c-hello 1 1
-LEVEL c-variables-const 1 0
-LEVEL c-functions-arrays 0 1
-MISSION robot-hello 5 150
+PLAYER 1000124 65535 7 7 20261124 999999
+LEVEL c-hello 3 1
+LEVEL c-variables-const 3 1
+LEVEL c-input-maths 3 1
+LEVEL c-decisions-switch 3 1
+LEVEL c-loops-2 3 1
+LEVEL c-arrays-2d 3 1
+LEVEL c-strings 3 1
+LEVEL c-functions-arrays 3 1
+LEVEL c-pointers-2 3 1
+LEVEL c-pointer-arith 3 1
+LEVEL c-malloc 3 1
+LEVEL c-scope-funcptr 3 1
+LEVEL c-structs 3 1
+LEVEL c-files 3 1
+LEVEL cpp-hello 3 1
+LEVEL cpp-references 3 1
+LEVEL cpp-new-delete 3 1
+LEVEL cpp-objects 3 1
+LEVEL cpp-classes 3 1
+LEVEL cpp-object-memory 3 1
+LEVEL cpp-linked-list 3 1
+LEVEL cpp-overloading 3 1
+LEVEL cpp-templates 3 1
+LEVEL cpp-strings-vectors 3 1
+LEVEL cpp-algorithms 3 1
+LEVEL cpp-lists 3 1
+LEVEL cpp-maps 3 1
+MISSION robot-hello 7 150
 #include <stdio.h>
 
 int main(void)
@@ -15,4 +39,230 @@ int main(void)
     return 0;
 }
 
-CHESS 0 0
+MISSION robot-coins 7 0
+
+MISSION robot-room 7 0
+
+MISSION robot-signs 7 0
+
+MISSION robot-stairs 7 0
+
+MISSION robot-route 7 0
+
+MISSION robot-commands 7 0
+
+MISSION robot-toolkit 7 0
+
+MISSION robot-labyrinth 7 0
+
+MISSION robot-cpp 7 0
+
+MISSION robot-hologram 7 0
+
+MISSION robot-fleet 7 0
+
+MISSION robot-rally 7 0
+
+MISSION heist-tipoff 7 0
+
+MISSION heist-block 7 0
+
+MISSION heist-van 7 0
+
+MISSION heist-gadgets 7 0
+
+MISSION heist-estate 7 0
+
+MISSION heist-bigheist 7 0
+
+MISSION heist-crates 7 0
+
+MISSION heist-chain 7 0
+
+MISSION bugs-hello 7 0
+
+MISSION bugs-grades 7 0
+
+MISSION bugs-loops 7 0
+
+MISSION bugs-matrix 7 0
+
+MISSION bugs-reverse 7 0
+
+MISSION bugs-swap 7 0
+
+MISSION bugs-numbers 7 0
+
+MISSION bugs-files 7 0
+
+MISSION bugs-bank 7 0
+
+MISSION bugs-deepcopy 7 0
+
+MISSION bugs-scores 7 0
+
+MISSION bugs-list 7 0
+
+MISSION bugs-receipt 7 0
+
+MISSION bugs-time 7 0
+
+MISSION bugs-toolkit 7 0
+
+MISSION bugs-walk 7 0
+
+MISSION bugs-calc 7 0
+
+MISSION bugs-roster 7 0
+
+MISSION bugs-rect 7 0
+
+MISSION bugs-refs 7 0
+
+MISSION bugs-grid 7 0
+
+MISSION bugs-points 7 0
+
+MISSION bugs-boxes 7 0
+
+MISSION bugs-templates 7 0
+
+MISSION bugs-train 7 0
+
+MISSION bugs-queue 7 0
+
+MISSION bugs-digits 7 0
+
+MISSION factory-mega 7 0
+
+MISSION chess-backrank 7 84
+#include <stdio.h>
+
+int main(void)
+{
+    move(at("a1"), at("a8"));
+
+    return 0;
+}
+
+MISSION chess-knight 0 88
+#include <stdio.h>
+
+int main(void)
+{
+    // your moves go here
+
+    return 0;
+}
+
+
+
+
+
+
+
+
+
+MISSION c-hello 7 86
+#include <stdio.h>
+
+int main(void)
+{
+    // Print Hello, World! here
+
+    return 0;
+}
+
+MISSION c-variables-const 7 0
+
+MISSION c-input-maths 7 0
+
+MISSION c-decisions-switch 7 0
+
+MISSION c-loops-2 7 0
+
+MISSION c-arrays-2d 7 0
+
+MISSION c-strings 7 0
+
+MISSION c-functions-arrays 7 0
+
+MISSION c-pointers-2 7 0
+
+MISSION c-pointer-arith 7 0
+
+MISSION c-malloc 7 0
+
+MISSION c-scope-funcptr 7 0
+
+MISSION c-structs 7 0
+
+MISSION c-files 7 0
+
+MISSION cpp-hello 7 0
+
+MISSION cpp-references 7 0
+
+MISSION cpp-new-delete 7 0
+
+MISSION cpp-objects 7 0
+
+MISSION cpp-classes 7 0
+
+MISSION cpp-object-memory 7 0
+
+MISSION cpp-linked-list 7 0
+
+MISSION cpp-overloading 7 0
+
+MISSION cpp-templates 7 0
+
+MISSION cpp-strings-vectors 7 0
+
+MISSION cpp-algorithms 7 0
+
+MISSION cpp-lists 7 0
+
+MISSION cpp-maps 7 0
+
+PROJECT proj-temperature 3 0
+
+PROJECT proj-calculator 4 0
+
+PROJECT proj-guessing 4 0
+
+PROJECT proj-gradebook 4 0
+
+PROJECT proj-wordguess 4 0
+
+PROJECT proj-tictactoe 4 129
+#include <stdio.h>
+
+int main(void)
+{
+    char board[3][3];
+
+    // Step 1: fill the board with '.' and print it
+
+    return 0;
+}
+
+PROJECT proj-dynlist 4 0
+
+PROJECT proj-geometry 4 0
+
+PROJECT proj-linkedlist 4 0
+
+PROJECT proj-clock 4 0
+
+PROJECT proj-stack 3 0
+
+PROJECT proj-todo 3 0
+
+PROJECT proj-rankings 4 0
+
+PROJECT proj-wordfreq 4 0
+
+PROJECT proj-urlshort 3 0
+
+CHESS 4 5

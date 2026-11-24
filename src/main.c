@@ -152,7 +152,7 @@ static void DrawToasts(void)
         else if (t->icon == TOAST_LEVEL) IconCrown(c, 36, t->color);
         else DrawStar(c, 16, t->color);
         UiText(t->title, r.x + 66, r.y + 10, 20, ColorAlpha(COL_TEXT, alpha));
-        BeginScissorMode((int)r.x, (int)r.y, (int)r.width - 8, (int)r.height);
+        UiBeginScissor((int)r.x, (int)r.y, (int)r.width - 8, (int)r.height);
         UiText(t->text, r.x + 66, r.y + 38, 15, ColorAlpha(COL_MUTED, alpha));
         EndScissorMode();
         y += h + 10;
@@ -334,7 +334,7 @@ void ScreenProfile(void)
         if (has) IconMedal(c, fminf(52, bh - 16), GetBadge(i)->color, i);
         else IconLock(c, 30, COL_PANEL_HI);
         UiText(GetBadge(i)->name, r.x + 68, r.y + bh / 2 - 22, 19, has ? COL_TEXT : COL_MUTED);
-        BeginScissorMode((int)r.x, (int)r.y, (int)r.width - 6, (int)r.height);
+        UiBeginScissor((int)r.x, (int)r.y, (int)r.width - 6, (int)r.height);
         UiText(GetBadge(i)->desc, r.x + 68, r.y + bh / 2 + 2, 15, COL_MUTED);
         EndScissorMode();
     }
@@ -365,6 +365,7 @@ int main(void)
         UiBeginFrame();
         BeginDrawing();
         ClearBackground(COL_BG);
+        UiApplyScale();
 
         switch (app.screen) {
             case SCREEN_MENU:      ScreenMenu();      break;
